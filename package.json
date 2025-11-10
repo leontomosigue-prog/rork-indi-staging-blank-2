@@ -64,7 +64,3 @@
   },
   "private": true
 }
-"babel": {
-  "presets": ["babel-preset-expo"],
-  "plugins": ["expo-router/babel", "nativewind/babel"]
-}
