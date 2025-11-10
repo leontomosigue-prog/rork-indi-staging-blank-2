@@ -1,6 +1,15 @@
 // api/index.ts
-import app from '../backend/hono';
+import { Hono } from 'hono';
+import backend from '../backend/hono';
 
-export default app;
+// cria um app "casca" só para montar o backend sob /api
+const api = new Hono();
+
+// tudo que o backend expõe (/, /ping, /trpc, etc.) vai aparecer com prefixo /api
+api.route('/api', backend);
+
+export default api;
+
+// alguns runtimes exigem o fetch handler também
 export const fetch = (request: Request, env: unknown, ctx: unknown) =>
-  app.fetch(request, env as any, ctx as any);
+  api.fetch(request, env as any, ctx as any);
