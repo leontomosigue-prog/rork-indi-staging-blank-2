@@ -62,9 +62,9 @@
     "eslint-config-expo": "9.2.0",
     "typescript": "~5.9.2"
   },
-  "private": true,
-"babel": {
-  "presets": ["babel-preset-expo"],
-  "plugins": ["expo-router/babel", "nativewind/babel"]
+    "private": true,
+  "babel": {
+    "presets": ["babel-preset-expo"],
+    "plugins": ["expo-router/babel", "nativewind/babel"]
+  }
 }
-
