@@ -9,6 +9,8 @@ import { User } from "./data/schemas";
 import { nanoid } from "nanoid";
 
 const app = new Hono();
+// rota de teste simples
+app.get('/ping', (c) => c.text('pong'))
 
 app.use("*", cors());
 
