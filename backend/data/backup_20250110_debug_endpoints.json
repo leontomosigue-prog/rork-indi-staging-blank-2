@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-01-10T12:00:00.000Z",
+  "note": "Snapshot before adding debug endpoints. All data files are created on first boot.",
+  "collections": {
+    "users": "Will be created by ensureSeeds on boot",
+    "machines": "Created on first access",
+    "rental_offers": "Created on first access",
+    "parts": "Created on first access",
+    "tickets": "Created on first access",
+    "conversations": "Created on first access",
+    "messages": "Created on first access"
+  },
+  "environment": {
+    "SAFE_MODE_DEBUG": "1"
+  },
+  "seedUsers": [
+    {
+      "email": "admin@indi.com",
+      "password": "admin123",
+      "roles": ["admin", "sales", "rental", "technical", "parts"]
+    },
+    {
+      "email": "cliente@indi.com",
+      "password": "cliente123",
+      "roles": []
+    }
+  ]
+}

@@ -1,0 +1,292 @@
+import { router } from 'expo-router';
+import { Fingerprint, Lock, Mail } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+import Colors from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
+
+export default function LoginScreen() {
+  const { login, loginWithBiometric, biometricAvailable, user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      console.log('🟢 login useEffect: user detected → navigate home');
+      try {
+        router.replace('/(tabs)/home' as any);
+        console.log('🟢 login useEffect: replace called');
+      } catch (err) {
+        console.log('🟡 login useEffect: replace failed, trying push...', err);
+        try {
+          router.push('/(tabs)/home' as any);
+          console.log('🟢 login useEffect: push called');
+        } catch (err2) {
+          console.log('🟡 login useEffect: push failed, trying setTimeout...', err2);
+          setTimeout(() => {
+            try {
+              router.replace('/(tabs)/home' as any);
+              console.log('🟢 login useEffect: setTimeout replace called');
+            } catch (err3) {
+              console.error('🔴 login useEffect: all navigation attempts failed', err3);
+            }
+          }, 0);
+        }
+      }
+    }
+  }, [user]);
+
+  const handleLogin = async () => {
+    console.log('🟢 handleLogin: Starting login process...');
+    console.log('🟢 handleLogin: Email:', email);
+    setErrorMessage('');
+    
+    if (!email.trim() || !password.trim()) {
+      console.log('🟢 handleLogin: Missing credentials');
+      setErrorMessage('Preencha e-mail e senha');
+      return;
+    }
+
+    setIsLoading(true);
+    console.log('🟢 handleLogin: Calling login function...');
+    const result = await login(email, password);
+    console.log('🟢 handleLogin: Login result:', result);
+    setIsLoading(false);
+
+    if (!result) {
+      console.log('🔴 handleLogin: Login failed');
+      setErrorMessage('E-mail ou senha incorretos');
+    } else {
+      console.log('🟢 handleLogin: Login successful, user will be set by AuthContext');
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    console.log('handleBiometricLogin: Starting biometric login...');
+    setIsLoading(true);
+    const result = await loginWithBiometric();
+    setIsLoading(false);
+
+    if (!result) {
+      Alert.alert('Erro', 'Falha na autenticação biométrica');
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.keyboardView, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={{ uri: 'https://via.placeholder.com/150x150.png?text=INDI' }}
+              style={styles.logo}
+            />
+            <Text style={styles.welcomeText}>Bem-vindo ao INDI</Text>
+            <Text style={styles.subtitle}>Faça login para continuar</Text>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Mail size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Lock size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Senha"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
+
+            {errorMessage ? (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            ) : null}
+
+            <Pressable onPress={() => Alert.alert('Recuperar Senha', 'Funcionalidade em desenvolvimento')}>
+              <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={Colors.surface} />
+              ) : (
+                <Text style={styles.loginButtonText}>Entrar</Text>
+              )}
+            </Pressable>
+
+            {biometricAvailable && (
+              <Pressable style={styles.biometricButton} onPress={handleBiometricLogin}>
+                <Fingerprint size={24} color={Colors.primary} />
+                <Text style={styles.biometricText}>Entrar com biometria</Text>
+              </Pressable>
+            )}
+
+            <Pressable style={styles.registerLink} onPress={() => router.push('/register' as any)}>
+              <Text style={styles.registerText}>
+                Não tem uma conta? <Text style={styles.registerTextBold}>Cadastre-se</Text>
+              </Text>
+            </Pressable>
+
+            <Pressable style={styles.debugLink} onPress={() => router.push('/debug-auth' as any)}>
+              <Text style={styles.debugText}>Debug Auth</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 24,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 40,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 24,
+    borderRadius: 60,
+  },
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: Colors.textLight,
+  },
+  form: {
+    flex: 1,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  forgotPassword: {
+    color: Colors.primary,
+    textAlign: 'right' as const,
+    marginBottom: 24,
+    fontSize: 14,
+  },
+  loginButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  loginButtonText: {
+    color: Colors.surface,
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginBottom: 24,
+  },
+  biometricText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '600' as const,
+    marginLeft: 8,
+  },
+  registerLink: {
+    marginTop: 'auto' as const,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  registerText: {
+    color: Colors.textLight,
+    fontSize: 14,
+  },
+  registerTextBold: {
+    color: Colors.primary,
+    fontWeight: '600' as const,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: 'center' as const,
+  },
+  debugLink: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  debugText: {
+    color: Colors.textLight,
+    fontSize: 12,
+    textDecorationLine: 'underline' as const,
+  },
+});
