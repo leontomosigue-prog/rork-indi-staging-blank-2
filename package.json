@@ -63,7 +63,7 @@
     "typescript": "~5.9.2"
   },
   "private": true,
-}"babel": {
+"babel": {
   "presets": ["babel-preset-expo"],
   "plugins": ["expo-router/babel", "nativewind/babel"]
 }
