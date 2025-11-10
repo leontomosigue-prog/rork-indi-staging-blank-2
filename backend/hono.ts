@@ -2,10 +2,10 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
-// ping bem simples
+// Test route - should return JSON
 app.get('/ping', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 
-// raiz da API (ajuda a testar em /api também)
+// Root route - should return text confirming backend is running
 app.get('/', (c) => c.text('API OK'));
 
 export default app;
