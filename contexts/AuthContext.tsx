@@ -3,8 +3,6 @@ import createContextHook from '@nkzw/create-context-hook';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from '@/types';
-import { trpcClient } from '@/lib/trpc';
-import type { User as BackendUser } from '@/backend/data/schemas';
 
 const STORAGE_KEYS = {
   CURRENT_USER: '@indi:user',
@@ -125,59 +123,51 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const normalizedEmail = (email || "").trim().toLowerCase();
     const normalizedPassword = (password || "").trim();
     
-    console.log('🔵 LOGIN start:', normalizedEmail);
-    console.log('🔵 LOGIN normalized email:', normalizedEmail);
-    console.log('🔵 LOGIN password length:', normalizedPassword.length);
+    console.log('🔵 LOGIN MOCK start:', normalizedEmail);
+    console.log('🔵 LOGIN MOCK password length:', normalizedPassword.length);
     
     try {
-      console.log('🔵 Calling backend login...');
-      const response = await trpcClient.users.login.mutate({ 
-        email: normalizedEmail, 
-        password: normalizedPassword 
-      });
-      console.log('🔵 LOGIN backend OK:', response?.user?.id);
-      console.log('🔵 LOGIN backend user:', JSON.stringify(response.user, null, 2));
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        console.log('🔴 LOGIN MOCK: Invalid email format');
+        return false;
+      }
       
-      const backendUser = response.user;
+      if (normalizedPassword.length < 6) {
+        console.log('🔴 LOGIN MOCK: Password too short (min 6 chars)');
+        return false;
+      }
       
-      const roleMap: Record<string, string> = {
-        'admin': 'Admin',
-        'sales': 'Vendas',
-        'rental': 'Locação',
-        'technical': 'Assistência Técnica',
-        'parts': 'Peças',
-      };
+      const isEmployee = normalizedEmail.endsWith('@indi.com.br');
+      const userType = isEmployee ? 'employee' : 'client';
+      const roles = isEmployee ? ['Vendas'] : [];
       
-      const mappedUser: User = {
-        id: backendUser.id,
-        type: backendUser.roles.includes('admin') || backendUser.roles.length > 0 ? 'employee' : 'client',
-        email: backendUser.email,
-        fullName: backendUser.name,
-        cpf: backendUser.cpf,
-        birthDate: backendUser.birthDate,
-        companyName: backendUser.companyName,
-        cnpj: backendUser.cnpj,
-        roles: backendUser.roles.map(r => roleMap[r] || r) as any,
+      const mockUser: User = {
+        id: '1',
+        type: userType,
+        email: normalizedEmail,
+        fullName: 'Usuário de Teste',
+        roles: roles as any,
         lgpdConsent: true,
-        lgpdConsentDate: backendUser.createdAt.toISOString(),
-        createdAt: backendUser.createdAt.toISOString(),
-        updatedAt: backendUser.updatedAt.toISOString(),
+        lgpdConsentDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       
-      console.log('🔵 LOGIN mapped user:', JSON.stringify(mappedUser, null, 2));
-      console.log('🔵 LOGIN setUser call...');
-      setUser(mappedUser);
-      console.log('🔵 LOGIN setUser OK');
+      console.log('🔵 LOGIN MOCK user created:', JSON.stringify(mockUser, null, 2));
+      console.log('🔵 LOGIN MOCK setUser call...');
+      setUser(mockUser);
+      console.log('🔵 LOGIN MOCK setUser OK');
       
-      console.log('🔵 LOGIN storage write...');
-      await AsyncStorage.setItem('@indi:user', JSON.stringify(mappedUser));
-      console.log('🔵 LOGIN storage OK');
-      console.log('🔵 LOGIN return true');
+      console.log('🔵 LOGIN MOCK storage write...');
+      await AsyncStorage.setItem('@indi:user', JSON.stringify(mockUser));
+      console.log('🔵 LOGIN MOCK storage OK');
+      console.log('🔵 LOGIN MOCK return true');
       
       return true;
     } catch (error) {
-      console.error('🔴 LOGIN error:', error);
-      console.error('🔴 LOGIN error details:', JSON.stringify(error, null, 2));
+      console.error('🔴 LOGIN MOCK error:', error);
+      console.error('🔴 LOGIN MOCK error details:', JSON.stringify(error, null, 2));
       return false;
     }
   }, []);
