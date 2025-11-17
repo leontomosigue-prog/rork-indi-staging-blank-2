@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
+import { MockDataProvider } from "@/contexts/MockDataContext";
 import { trpc, trpcClient } from "@/lib/trpc";
 
 SplashScreen.preventAutoHideAsync();
@@ -22,15 +23,17 @@ export default function RootLayout() {
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <AuthProvider>
                         <DataProvider>
-                            <Stack screenOptions={{ headerBackTitle: "Voltar" }}>
-                                <Stack.Screen name="index" options={{ headerShown: false }} />
-                                <Stack.Screen name="login" options={{ headerShown: false }} />
-                                <Stack.Screen name="register" options={{ headerShown: false }} />
-                                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                                <Stack.Screen name="edit-profile" options={{ title: "Editar Perfil" }} />
-                                <Stack.Screen name="chat/[id]" options={{ title: "Conversa" }} />
-                                <Stack.Screen name="debug-auth" options={{ title: "Debug Auth" }} />
-                            </Stack>
+                            <MockDataProvider>
+                                <Stack screenOptions={{ headerBackTitle: "Voltar" }}>
+                                    <Stack.Screen name="index" options={{ headerShown: false }} />
+                                    <Stack.Screen name="login" options={{ headerShown: false }} />
+                                    <Stack.Screen name="register" options={{ headerShown: false }} />
+                                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                                    <Stack.Screen name="edit-profile" options={{ title: "Editar Perfil" }} />
+                                    <Stack.Screen name="chat/[id]" options={{ title: "Conversa" }} />
+                                    <Stack.Screen name="debug-auth" options={{ title: "Debug Auth" }} />
+                                </Stack>
+                            </MockDataProvider>
                         </DataProvider>
                     </AuthProvider>
                 </GestureHandlerRootView>

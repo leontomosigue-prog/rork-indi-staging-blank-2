@@ -14,15 +14,15 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { Plus, Edit2, Trash2, Package, Search } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 
 interface PartFormData {
   sku: string;
-  name: string;
-  category: 'hidraulica' | 'motor' | 'eletrica' | 'outros';
-  price: string;
-  stock: string;
+  nome: string;
+  categoria: 'hidraulica' | 'motor' | 'eletrica' | 'outros';
+  preco: string;
+  estoque: string;
 }
 
 const CATEGORIES = [
@@ -35,86 +35,48 @@ const CATEGORIES = [
 export default function PartsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { listPecas, criarPeca, atualizarPeca, removerPeca, criarConversa, isLoading } = useMockData();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingPart, setEditingPart] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [formData, setFormData] = useState<PartFormData>({
     sku: '',
-    name: '',
-    category: 'outros',
-    price: '',
-    stock: '',
+    nome: '',
+    categoria: 'outros',
+    preco: '',
+    estoque: '',
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
-  const partsQuery = trpc.parts.list.useQuery();
-  const createMutation = trpc.parts.create.useMutation({
-    onSuccess: () => {
-      partsQuery.refetch();
-      setIsModalVisible(false);
-      resetForm();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const updateMutation = trpc.parts.update.useMutation({
-    onSuccess: () => {
-      partsQuery.refetch();
-      setIsModalVisible(false);
-      resetForm();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const removeMutation = trpc.parts.remove.useMutation({
-    onSuccess: () => {
-      partsQuery.refetch();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const createConversationMutation = trpc.conversations.createForTicket.useMutation({
-    onSuccess: (data) => {
-      router.push(`/chat/${data.id}` as any);
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
+  const pecas = listPecas();
 
   const hasAdminOrPartsRole = user?.roles?.some(
     (role) => role === 'Admin' || role === 'Peças'
   );
 
   const filteredParts = useMemo(() => {
-    let result = partsQuery.data || [];
+    let result = pecas;
 
     if (searchText) {
       const search = searchText.toLowerCase();
       result = result.filter(
         (part) =>
-          part.name.toLowerCase().includes(search) ||
+          part.nome.toLowerCase().includes(search) ||
           part.sku.toLowerCase().includes(search)
       );
     }
 
     if (selectedCategory) {
-      result = result.filter((part) => part.category === selectedCategory);
+      result = result.filter((part) => part.categoria === selectedCategory);
     }
 
     return result;
-  }, [partsQuery.data, searchText, selectedCategory]);
+  }, [pecas, searchText, selectedCategory]);
 
   const resetForm = () => {
-    setFormData({ sku: '', name: '', category: 'outros', price: '', stock: '' });
+    setFormData({ sku: '', nome: '', categoria: 'outros', preco: '', estoque: '' });
     setEditingPart(null);
   };
 
@@ -123,10 +85,10 @@ export default function PartsScreen() {
       setEditingPart(part.id);
       setFormData({
         sku: part.sku,
-        name: part.name,
-        category: part.category,
-        price: part.price.toString(),
-        stock: part.stock.toString(),
+        nome: part.nome,
+        categoria: part.categoria,
+        preco: part.preco.toString(),
+        estoque: part.estoque.toString(),
       });
     } else {
       resetForm();
@@ -134,38 +96,45 @@ export default function PartsScreen() {
     setIsModalVisible(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.sku || !formData.name || !formData.price || !formData.stock) {
+  const handleSubmit = async () => {
+    if (!formData.sku || !formData.nome || !formData.preco || !formData.estoque) {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
 
-    const price = parseFloat(formData.price);
-    const stock = parseInt(formData.stock, 10);
-    if (isNaN(price) || isNaN(stock)) {
+    const preco = parseFloat(formData.preco);
+    const estoque = parseInt(formData.estoque, 10);
+    if (isNaN(preco) || isNaN(estoque)) {
       Alert.alert('Erro', 'Valores inválidos');
       return;
     }
 
-    if (editingPart) {
-      updateMutation.mutate({
-        userId: user!.id,
-        partId: editingPart,
-        sku: formData.sku,
-        name: formData.name,
-        category: formData.category,
-        price,
-        stock,
-      });
-    } else {
-      createMutation.mutate({
-        userId: user!.id,
-        sku: formData.sku,
-        name: formData.name,
-        category: formData.category,
-        price,
-        stock,
-      });
+    setIsSaving(true);
+    try {
+      if (editingPart) {
+        await atualizarPeca(editingPart, {
+          sku: formData.sku,
+          nome: formData.nome,
+          categoria: formData.categoria,
+          preco,
+          estoque,
+        });
+      } else {
+        await criarPeca({
+          sku: formData.sku,
+          nome: formData.nome,
+          categoria: formData.categoria,
+          preco,
+          estoque,
+        });
+      }
+      setIsModalVisible(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving part:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao salvar a peça');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -178,48 +147,54 @@ export default function PartsScreen() {
         {
           text: 'Excluir',
           style: 'destructive',
-          onPress: () => removeMutation.mutate({ userId: user!.id, partId: id }),
+          onPress: async () => {
+            await removerPeca(id);
+          },
         },
       ]
     );
   };
 
-  const handleRequestPart = async (partId: string, sku: string) => {
+  const handleRequestPart = async (part: any) => {
     if (!user) return;
 
+    setIsRequesting(true);
     try {
-      const ticketResponse = await createTicketMutation.mutateAsync({
-        userId: user.id,
-        type: 'parts_request',
-        area: 'pecas',
-        payload: { partId, sku },
+      const conversaId = await criarConversa({
+        area: 'Peças',
+        titulo: `Peça - ${part.sku}`,
+        mensagemInicial: `Olá, gostaria de solicitar a peça ${part.nome} (SKU: ${part.sku}).`,
       });
 
-      await createConversationMutation.mutateAsync({
-        userId: user.id,
-        ticketId: ticketResponse.id,
-      });
+      if (conversaId) {
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a solicitação');
+      }
     } catch (error) {
       console.error('Error requesting part:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao solicitar a peça');
+    } finally {
+      setIsRequesting(false);
     }
   };
 
-  const getCategoryLabel = (category: string) => {
-    const cat = CATEGORIES.find((c) => c.value === category);
-    return cat ? cat.label : category;
+  const getCategoryLabel = (categoria: string) => {
+    const cat = CATEGORIES.find((c) => c.value === categoria);
+    return cat ? cat.label : categoria;
   };
 
   const renderPart = ({ item }: any) => (
     <View style={styles.partCard}>
       <View style={styles.partInfo}>
-        <Text style={styles.partName}>{item.name}</Text>
+        <Text style={styles.partName}>{item.nome}</Text>
         <Text style={styles.partSku}>SKU: {item.sku}</Text>
-        <Text style={styles.partCategory}>{getCategoryLabel(item.category)}</Text>
+        <Text style={styles.partCategory}>{getCategoryLabel(item.categoria)}</Text>
         <View style={styles.partMeta}>
           <Text style={styles.partPrice}>
-            R$ {item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            R$ {item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
-          <Text style={styles.partStock}>Estoque: {item.stock}</Text>
+          <Text style={styles.partStock}>Estoque: {item.estoque}</Text>
         </View>
       </View>
 
@@ -242,8 +217,8 @@ export default function PartsScreen() {
         ) : (
           <TouchableOpacity
             style={[styles.actionButton, styles.requestButton]}
-            onPress={() => handleRequestPart(item.id, item.sku)}
-            disabled={createTicketMutation.isPending || createConversationMutation.isPending}
+            onPress={() => handleRequestPart(item)}
+            disabled={isRequesting}
           >
             <Package size={18} color="#fff" />
             <Text style={styles.requestButtonText}>Solicitar</Text>
@@ -253,7 +228,7 @@ export default function PartsScreen() {
     </View>
   );
 
-  if (partsQuery.isLoading) {
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -370,8 +345,8 @@ export default function PartsScreen() {
             <Text style={styles.label}>Nome</Text>
             <TextInput
               style={styles.input}
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              value={formData.nome}
+              onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Válvula Hidráulica"
             />
 
@@ -382,14 +357,14 @@ export default function PartsScreen() {
                   key={cat.value}
                   style={[
                     styles.categoryOption,
-                    formData.category === cat.value && styles.categoryOptionActive,
+                    formData.categoria === cat.value && styles.categoryOptionActive,
                   ]}
-                  onPress={() => setFormData({ ...formData, category: cat.value })}
+                  onPress={() => setFormData({ ...formData, categoria: cat.value })}
                 >
                   <Text
                     style={[
                       styles.categoryOptionText,
-                      formData.category === cat.value && styles.categoryOptionTextActive,
+                      formData.categoria === cat.value && styles.categoryOptionTextActive,
                     ]}
                   >
                     {cat.label}
@@ -401,8 +376,8 @@ export default function PartsScreen() {
             <Text style={styles.label}>Preço (R$)</Text>
             <TextInput
               style={styles.input}
-              value={formData.price}
-              onChangeText={(text) => setFormData({ ...formData, price: text })}
+              value={formData.preco}
+              onChangeText={(text) => setFormData({ ...formData, preco: text })}
               placeholder="Ex: 150.00"
               keyboardType="numeric"
             />
@@ -410,22 +385,18 @@ export default function PartsScreen() {
             <Text style={styles.label}>Estoque</Text>
             <TextInput
               style={styles.input}
-              value={formData.stock}
-              onChangeText={(text) => setFormData({ ...formData, stock: text })}
+              value={formData.estoque}
+              onChangeText={(text) => setFormData({ ...formData, estoque: text })}
               placeholder="Ex: 10"
               keyboardType="numeric"
             />
 
             <TouchableOpacity
-              style={[
-                styles.submitButton,
-                (createMutation.isPending || updateMutation.isPending) &&
-                  styles.submitButtonDisabled,
-              ]}
+              style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             >
-              {createMutation.isPending || updateMutation.isPending ? (
+              {isSaving ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>

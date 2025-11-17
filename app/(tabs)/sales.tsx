@@ -13,77 +13,39 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { Plus, Edit2, Trash2, ShoppingCart } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 
 interface MachineFormData {
-  name: string;
-  brand: string;
-  model: string;
-  price: string;
+  nome: string;
+  marca: string;
+  modelo: string;
+  preco: string;
 }
 
 export default function SalesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { listMaquinas, criarMaquina, atualizarMaquina, removerMaquina, criarConversa, isLoading } = useMockData();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMachine, setEditingMachine] = useState<string | null>(null);
   const [formData, setFormData] = useState<MachineFormData>({
-    name: '',
-    brand: '',
-    model: '',
-    price: '',
+    nome: '',
+    marca: '',
+    modelo: '',
+    preco: '',
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
-  const machinesQuery = trpc.machines.list.useQuery();
-  const createMutation = trpc.machines.create.useMutation({
-    onSuccess: () => {
-      machinesQuery.refetch();
-      setIsModalVisible(false);
-      resetForm();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const updateMutation = trpc.machines.update.useMutation({
-    onSuccess: () => {
-      machinesQuery.refetch();
-      setIsModalVisible(false);
-      resetForm();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const removeMutation = trpc.machines.remove.useMutation({
-    onSuccess: () => {
-      machinesQuery.refetch();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const createConversationMutation = trpc.conversations.createForTicket.useMutation({
-    onSuccess: (data) => {
-      router.push(`/chat/${data.id}` as any);
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
+  const maquinas = listMaquinas('venda');
 
   const hasAdminOrSalesRole = user?.roles?.some(
     (role) => role === 'Admin' || role === 'Vendas'
   );
 
   const resetForm = () => {
-    setFormData({ name: '', brand: '', model: '', price: '' });
+    setFormData({ nome: '', marca: '', modelo: '', preco: '' });
     setEditingMachine(null);
   };
 
@@ -91,10 +53,10 @@ export default function SalesScreen() {
     if (machine) {
       setEditingMachine(machine.id);
       setFormData({
-        name: machine.name,
-        brand: machine.brand,
-        model: machine.model,
-        price: machine.price.toString(),
+        nome: machine.nome,
+        marca: machine.marca,
+        modelo: machine.modelo,
+        preco: machine.preco.toString(),
       });
     } else {
       resetForm();
@@ -102,35 +64,43 @@ export default function SalesScreen() {
     setIsModalVisible(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name || !formData.brand || !formData.model || !formData.price) {
+  const handleSubmit = async () => {
+    if (!formData.nome || !formData.marca || !formData.modelo || !formData.preco) {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
 
-    const price = parseFloat(formData.price);
-    if (isNaN(price)) {
+    const preco = parseFloat(formData.preco);
+    if (isNaN(preco)) {
       Alert.alert('Erro', 'Preço inválido');
       return;
     }
 
-    if (editingMachine) {
-      updateMutation.mutate({
-        userId: user!.id,
-        machineId: editingMachine,
-        name: formData.name,
-        brand: formData.brand,
-        model: formData.model,
-        price,
-      });
-    } else {
-      createMutation.mutate({
-        userId: user!.id,
-        name: formData.name,
-        brand: formData.brand,
-        model: formData.model,
-        price,
-      });
+    setIsSaving(true);
+    try {
+      if (editingMachine) {
+        await atualizarMaquina(editingMachine, {
+          nome: formData.nome,
+          marca: formData.marca,
+          modelo: formData.modelo,
+          preco,
+        });
+      } else {
+        await criarMaquina({
+          tipo: 'venda',
+          nome: formData.nome,
+          marca: formData.marca,
+          modelo: formData.modelo,
+          preco,
+        });
+      }
+      setIsModalVisible(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving machine:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao salvar a máquina');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -143,41 +113,47 @@ export default function SalesScreen() {
         {
           text: 'Excluir',
           style: 'destructive',
-          onPress: () => removeMutation.mutate({ userId: user!.id, machineId: id }),
+          onPress: async () => {
+            await removerMaquina(id);
+          },
         },
       ]
     );
   };
 
-  const handleRequestQuote = async (machineId: string) => {
+  const handleRequestQuote = async (machine: any) => {
     if (!user) return;
 
+    setIsRequesting(true);
     try {
-      const ticketResponse = await createTicketMutation.mutateAsync({
-        userId: user.id,
-        type: 'sales_quote',
-        area: 'vendas',
-        payload: { machineId },
+      const conversaId = await criarConversa({
+        area: 'Vendas',
+        titulo: `Orçamento - ${machine.nome}`,
+        mensagemInicial: `Olá, gostaria de solicitar um orçamento para ${machine.nome} - ${machine.marca} ${machine.modelo}.`,
       });
 
-      await createConversationMutation.mutateAsync({
-        userId: user.id,
-        ticketId: ticketResponse.id,
-      });
+      if (conversaId) {
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a solicitação');
+      }
     } catch (error) {
       console.error('Error requesting quote:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao solicitar o orçamento');
+    } finally {
+      setIsRequesting(false);
     }
   };
 
   const renderMachine = ({ item }: any) => (
     <View style={styles.machineCard}>
       <View style={styles.machineInfo}>
-        <Text style={styles.machineName}>{item.name}</Text>
+        <Text style={styles.machineName}>{item.nome}</Text>
         <Text style={styles.machineDetails}>
-          {item.brand} - {item.model}
+          {item.marca} - {item.modelo}
         </Text>
         <Text style={styles.machinePrice}>
-          R$ {item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          R$ {item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </Text>
       </View>
 
@@ -200,8 +176,8 @@ export default function SalesScreen() {
         ) : (
           <TouchableOpacity
             style={[styles.actionButton, styles.quoteButton]}
-            onPress={() => handleRequestQuote(item.id)}
-            disabled={createTicketMutation.isPending || createConversationMutation.isPending}
+            onPress={() => handleRequestQuote(item)}
+            disabled={isRequesting}
           >
             <ShoppingCart size={18} color="#fff" />
             <Text style={styles.quoteButtonText}>Orçamento</Text>
@@ -211,7 +187,7 @@ export default function SalesScreen() {
     </View>
   );
 
-  if (machinesQuery.isLoading) {
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -235,7 +211,7 @@ export default function SalesScreen() {
       />
 
       <FlatList
-        data={machinesQuery.data || []}
+        data={maquinas}
         keyExtractor={(item) => item.id}
         renderItem={renderMachine}
         contentContainerStyle={styles.listContainer}
@@ -274,46 +250,42 @@ export default function SalesScreen() {
             <Text style={styles.label}>Nome</Text>
             <TextInput
               style={styles.input}
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              value={formData.nome}
+              onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Empilhadeira Elétrica"
             />
 
             <Text style={styles.label}>Marca</Text>
             <TextInput
               style={styles.input}
-              value={formData.brand}
-              onChangeText={(text) => setFormData({ ...formData, brand: text })}
+              value={formData.marca}
+              onChangeText={(text) => setFormData({ ...formData, marca: text })}
               placeholder="Ex: Heli"
             />
 
             <Text style={styles.label}>Modelo</Text>
             <TextInput
               style={styles.input}
-              value={formData.model}
-              onChangeText={(text) => setFormData({ ...formData, model: text })}
+              value={formData.modelo}
+              onChangeText={(text) => setFormData({ ...formData, modelo: text })}
               placeholder="Ex: CPD18"
             />
 
             <Text style={styles.label}>Preço (R$)</Text>
             <TextInput
               style={styles.input}
-              value={formData.price}
-              onChangeText={(text) => setFormData({ ...formData, price: text })}
+              value={formData.preco}
+              onChangeText={(text) => setFormData({ ...formData, preco: text })}
               placeholder="Ex: 85000.00"
               keyboardType="numeric"
             />
 
             <TouchableOpacity
-              style={[
-                styles.submitButton,
-                (createMutation.isPending || updateMutation.isPending) &&
-                  styles.submitButtonDisabled,
-              ]}
+              style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             >
-              {createMutation.isPending || updateMutation.isPending ? (
+              {isSaving ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>

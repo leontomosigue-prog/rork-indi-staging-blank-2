@@ -14,92 +14,54 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Send, CheckCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
+  const { conversas, listMensagens, enviarMensagem, marcarConversaComoResolvida } = useMockData();
   const [messageText, setMessageText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const conversationQuery = trpc.conversations.listMine.useQuery(
-    { userId: user?.id || '' },
-    { enabled: !!user?.id }
-  );
-
-  const messagesQuery = trpc.messages.listByConversation.useQuery(
-    { userId: user?.id || '', conversationId: id || '' },
-    { enabled: !!user?.id && !!id }
-  );
-
-  const sendMessageMutation = trpc.messages.send.useMutation({
-    onSuccess: () => {
-      messagesQuery.refetch();
-      setMessageText('');
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-
-  const archiveMutation = trpc.conversations.archiveForUser.useMutation({
-    onSuccess: () => {
-      Alert.alert('Sucesso', 'Conversa arquivada com sucesso', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-
-  const updateStatusMutation = trpc.tickets.updateStatus.useMutation({
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-
-  const conversation = conversationQuery.data?.find((c) => c.id === id);
-
-  const hasAreaRole = (area: string) => {
-    if (!user?.roles) return false;
-    
-    const roleMap: Record<string, string> = {
-      'vendas': 'Vendas',
-      'locacao': 'Locação',
-      'assistencia': 'Assistência Técnica',
-      'pecas': 'Peças',
-    };
-
-    const requiredRole = roleMap[area];
-    return user.roles.includes('Admin' as any) || user.roles.includes(requiredRole as any);
-  };
+  const conversa = conversas.find((c) => c.id === id);
+  const mensagens = id ? listMensagens(id) : [];
 
   useEffect(() => {
-    if (messagesQuery.data && messagesQuery.data.length > 0) {
+    if (mensagens.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [messagesQuery.data]);
+  }, [mensagens]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!messageText.trim() || !user?.id || !id) return;
 
-    sendMessageMutation.mutate({
-      userId: user.id,
-      conversationId: id,
-      text: messageText.trim(),
-    });
+    setIsSending(true);
+    try {
+      const mensagem = await enviarMensagem(id, messageText.trim());
+      if (mensagem) {
+        setMessageText('');
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } else {
+        Alert.alert('Erro', 'Não foi possível enviar a mensagem');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao enviar a mensagem');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleResolve = async () => {
-    if (!user?.id || !id || !conversation) return;
+    if (!user?.id || !id) return;
 
     Alert.alert(
       'Resolver conversa',
@@ -109,30 +71,20 @@ export default function ChatScreen() {
         {
           text: 'Resolver',
           onPress: async () => {
+            setIsResolving(true);
             try {
-              await archiveMutation.mutateAsync({
-                userId: user.id,
-                conversationId: id,
-              });
-
-              const ticketId = conversation.ticketId;
-              const ticketsData = await fetch(
-                `${process.env.EXPO_PUBLIC_RORK_API_BASE_URL}/api/trpc/tickets.listMine?input=${encodeURIComponent(
-                  JSON.stringify({ userId: user.id })
-                )}`
-              ).then(r => r.json());
-
-              const ticket = ticketsData?.result?.data?.find((t: any) => t.id === ticketId);
-
-              if (ticket && hasAreaRole(ticket.area)) {
-                await updateStatusMutation.mutateAsync({
-                  userId: user.id,
-                  ticketId: ticket.id,
-                  status: 'resolvido',
-                });
-              }
+              await marcarConversaComoResolvida(id);
+              Alert.alert('Sucesso', 'Conversa marcada como resolvida', [
+                {
+                  text: 'OK',
+                  onPress: () => router.back(),
+                },
+              ]);
             } catch (error) {
               console.error('Error resolving conversation:', error);
+              Alert.alert('Erro', 'Ocorreu um erro ao resolver a conversa');
+            } finally {
+              setIsResolving(false);
             }
           },
         },
@@ -141,7 +93,7 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: any) => {
-    const isMyMessage = item.senderId === user?.id;
+    const isMyMessage = item.autorId === user?.id;
 
     return (
       <View
@@ -156,13 +108,16 @@ export default function ChatScreen() {
             isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
           ]}
         >
+          {!isMyMessage && (
+            <Text style={styles.senderName}>{item.autorNome}</Text>
+          )}
           <Text
             style={[
               styles.messageText,
               isMyMessage ? styles.myMessageText : styles.otherMessageText,
             ]}
           >
-            {item.text}
+            {item.texto}
           </Text>
           <Text
             style={[
@@ -180,13 +135,15 @@ export default function ChatScreen() {
     );
   };
 
-  if (messagesQuery.isLoading || conversationQuery.isLoading) {
+  if (!conversa) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.errorText}>Conversa não encontrada</Text>
       </View>
     );
   }
+
+  const canResolve = user?.type === 'employee' && conversa.status === 'aberta';
 
   return (
     <KeyboardAvoidingView
@@ -196,28 +153,23 @@ export default function ChatScreen() {
     >
       <Stack.Screen
         options={{
-          title: 'Conversa',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={handleResolve}
-              disabled={archiveMutation.isPending || updateStatusMutation.isPending}
-            >
-              <CheckCircle
-                size={24}
-                color={
-                  archiveMutation.isPending || updateStatusMutation.isPending
-                    ? Colors.textLight
-                    : Colors.success
-                }
-              />
-            </TouchableOpacity>
-          ),
+          title: conversa.titulo,
+          headerRight: canResolve
+            ? () => (
+                <TouchableOpacity onPress={handleResolve} disabled={isResolving}>
+                  <CheckCircle
+                    size={24}
+                    color={isResolving ? Colors.textLight : '#10b981'}
+                  />
+                </TouchableOpacity>
+              )
+            : undefined,
         }}
       />
 
       <FlatList
         ref={flatListRef}
-        data={messagesQuery.data || []}
+        data={mensagens}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContainer}
@@ -229,30 +181,39 @@ export default function ChatScreen() {
         }
       />
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={messageText}
-          onChangeText={setMessageText}
-          placeholder="Digite uma mensagem..."
-          multiline
-          maxLength={1000}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!messageText.trim() || sendMessageMutation.isPending) && styles.sendButtonDisabled,
-          ]}
-          onPress={handleSend}
-          disabled={!messageText.trim() || sendMessageMutation.isPending}
-        >
-          {sendMessageMutation.isPending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Send size={20} color="#fff" />
-          )}
-        </TouchableOpacity>
-      </View>
+      {conversa.status === 'aberta' && (
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={messageText}
+            onChangeText={setMessageText}
+            placeholder="Digite uma mensagem..."
+            multiline
+            maxLength={1000}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!messageText.trim() || isSending) && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!messageText.trim() || isSending}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Send size={20} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {conversa.status === 'resolvida' && (
+        <View style={styles.resolvedBanner}>
+          <CheckCircle size={20} color="#10b981" />
+          <Text style={styles.resolvedText}>Conversa resolvida</Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -266,6 +227,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.textLight,
   },
   messagesContainer: {
     padding: 16,
@@ -291,7 +256,13 @@ const styles = StyleSheet.create({
   otherMessageBubble: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#e5e7eb',
+  },
+  senderName: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.text,
+    marginBottom: 4,
   },
   messageText: {
     fontSize: 15,
@@ -335,7 +306,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: '#e5e7eb',
     alignItems: 'flex-end' as const,
   },
   input: {
@@ -358,5 +329,20 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  resolvedBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    padding: 16,
+    backgroundColor: '#d1fae5',
+    borderTopWidth: 1,
+    borderTopColor: '#10b981',
+  },
+  resolvedText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#10b981',
   },
 });

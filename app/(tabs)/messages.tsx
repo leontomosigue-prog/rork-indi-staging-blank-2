@@ -5,52 +5,36 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   Modal,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { MessageSquare, Plus } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 
-const AREAS = [
-  { value: 'vendas', label: 'Vendas', type: 'sales_quote' },
-  { value: 'locacao', label: 'Locação', type: 'rental_request' },
-  { value: 'pecas', label: 'Peças', type: 'parts_request' },
-  { value: 'assistencia', label: 'Assistência', type: 'service' },
-] as const;
+type Area = 'Vendas' | 'Locação' | 'Assistência Técnica' | 'Peças';
+
+const AREAS: { value: Area; label: string }[] = [
+  { value: 'Vendas', label: 'Vendas' },
+  { value: 'Locação', label: 'Locação' },
+  { value: 'Peças', label: 'Peças' },
+  { value: 'Assistência Técnica', label: 'Assistência' },
+];
 
 export default function MessagesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { listConversasPorUsuario, criarConversa, isLoading } = useMockData();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedArea, setSelectedArea] = useState<string>('vendas');
+  const [selectedArea, setSelectedArea] = useState<Area>('Vendas');
   const [reason, setReason] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
-  const conversationsQuery = trpc.conversations.listMine.useQuery(
-    { userId: user?.id || '' },
-    { enabled: !!user?.id }
-  );
-
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-
-  const createConversationMutation = trpc.conversations.createForTicket.useMutation({
-    onSuccess: (data) => {
-      setIsModalVisible(false);
-      setReason('');
-      router.push(`/chat/${data.id}` as any);
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
+  const conversas = user ? listConversasPorUsuario(user) : [];
 
   const handleCreateConversation = async () => {
     if (!reason.trim()) {
@@ -60,27 +44,30 @@ export default function MessagesScreen() {
 
     if (!user) return;
 
+    setIsCreating(true);
     try {
-      const area = AREAS.find((a) => a.value === selectedArea);
-      if (!area) return;
-
-      const ticketResponse = await createTicketMutation.mutateAsync({
-        userId: user.id,
-        type: area.type as any,
-        area: area.value as any,
-        payload: { reason },
+      const conversaId = await criarConversa({
+        area: selectedArea,
+        titulo: `${selectedArea} - ${reason.slice(0, 30)}`,
+        mensagemInicial: reason,
       });
 
-      await createConversationMutation.mutateAsync({
-        userId: user.id,
-        ticketId: ticketResponse.id,
-      });
+      if (conversaId) {
+        setIsModalVisible(false);
+        setReason('');
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a conversa');
+      }
     } catch (error) {
       console.error('Error creating conversation:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao criar a conversa');
+    } finally {
+      setIsCreating(false);
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string) => {
     const now = new Date();
     const diff = now.getTime() - new Date(date).getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -111,16 +98,21 @@ export default function MessagesScreen() {
         <MessageSquare size={24} color={Colors.primary} />
       </View>
       <View style={styles.conversationInfo}>
-        <Text style={styles.conversationTitle}>Conversa #{item.id.slice(0, 8)}</Text>
-        <Text style={styles.conversationSubtitle}>Ticket: {item.ticketId.slice(0, 8)}</Text>
+        <Text style={styles.conversationTitle}>{item.titulo}</Text>
+        <Text style={styles.conversationSubtitle}>{item.area}</Text>
       </View>
       <View style={styles.conversationMeta}>
-        <Text style={styles.conversationDate}>{formatDate(item.lastMessageAt)}</Text>
+        <Text style={styles.conversationDate}>{formatDate(item.updatedAt)}</Text>
+        {item.status === 'resolvida' && (
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>Resolvida</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
 
-  if (conversationsQuery.isLoading) {
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -142,7 +134,7 @@ export default function MessagesScreen() {
       />
 
       <FlatList
-        data={conversationsQuery.data || []}
+        data={conversas}
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
         contentContainerStyle={styles.listContainer}
@@ -215,15 +207,11 @@ export default function MessagesScreen() {
             />
 
             <TouchableOpacity
-              style={[
-                styles.submitButton,
-                (createTicketMutation.isPending || createConversationMutation.isPending) &&
-                  styles.submitButtonDisabled,
-              ]}
+              style={[styles.submitButton, isCreating && styles.submitButtonDisabled]}
               onPress={handleCreateConversation}
-              disabled={createTicketMutation.isPending || createConversationMutation.isPending}
+              disabled={isCreating}
             >
-              {createTicketMutation.isPending || createConversationMutation.isPending ? (
+              {isCreating ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>Criar Conversa</Text>
@@ -290,6 +278,18 @@ const styles = StyleSheet.create({
   conversationDate: {
     fontSize: 12,
     color: Colors.textLight,
+    marginBottom: 4,
+  },
+  statusBadge: {
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: '#10b981',
   },
   emptyContainer: {
     flex: 1,

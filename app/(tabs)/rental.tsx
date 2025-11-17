@@ -13,79 +13,41 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { Plus, Edit2, Trash2, Calendar } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 
 interface RentalFormData {
-  name: string;
-  brand: string;
-  model: string;
-  dailyRate: string;
-  monthlyRate: string;
+  nome: string;
+  marca: string;
+  modelo: string;
+  diaria: string;
+  mensal: string;
 }
 
 export default function RentalScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { listMaquinas, criarMaquina, atualizarMaquina, removerMaquina, criarConversa, isLoading } = useMockData();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState<string | null>(null);
   const [formData, setFormData] = useState<RentalFormData>({
-    name: '',
-    brand: '',
-    model: '',
-    dailyRate: '',
-    monthlyRate: '',
+    nome: '',
+    marca: '',
+    modelo: '',
+    diaria: '',
+    mensal: '',
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
-  const offersQuery = trpc.rental_offers.list.useQuery();
-  const createMutation = trpc.rental_offers.create.useMutation({
-    onSuccess: () => {
-      offersQuery.refetch();
-      setIsModalVisible(false);
-      resetForm();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const updateMutation = trpc.rental_offers.update.useMutation({
-    onSuccess: () => {
-      offersQuery.refetch();
-      setIsModalVisible(false);
-      resetForm();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const removeMutation = trpc.rental_offers.remove.useMutation({
-    onSuccess: () => {
-      offersQuery.refetch();
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
-  const createConversationMutation = trpc.conversations.createForTicket.useMutation({
-    onSuccess: (data) => {
-      router.push(`/chat/${data.id}` as any);
-    },
-    onError: (error) => {
-      Alert.alert('Erro', error.message);
-    },
-  });
+  const maquinas = listMaquinas('locacao');
 
   const hasAdminOrRentalRole = user?.roles?.some(
     (role) => role === 'Admin' || role === 'Locação'
   );
 
   const resetForm = () => {
-    setFormData({ name: '', brand: '', model: '', dailyRate: '', monthlyRate: '' });
+    setFormData({ nome: '', marca: '', modelo: '', diaria: '', mensal: '' });
     setEditingOffer(null);
   };
 
@@ -93,11 +55,11 @@ export default function RentalScreen() {
     if (offer) {
       setEditingOffer(offer.id);
       setFormData({
-        name: offer.name,
-        brand: offer.brand,
-        model: offer.model,
-        dailyRate: offer.dailyRate.toString(),
-        monthlyRate: offer.monthlyRate.toString(),
+        nome: offer.nome,
+        marca: offer.marca,
+        modelo: offer.modelo,
+        diaria: offer.diaria.toString(),
+        mensal: offer.mensal.toString(),
       });
     } else {
       resetForm();
@@ -105,38 +67,46 @@ export default function RentalScreen() {
     setIsModalVisible(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name || !formData.brand || !formData.model || !formData.dailyRate || !formData.monthlyRate) {
+  const handleSubmit = async () => {
+    if (!formData.nome || !formData.marca || !formData.modelo || !formData.diaria || !formData.mensal) {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
 
-    const dailyRate = parseFloat(formData.dailyRate);
-    const monthlyRate = parseFloat(formData.monthlyRate);
-    if (isNaN(dailyRate) || isNaN(monthlyRate)) {
+    const diaria = parseFloat(formData.diaria);
+    const mensal = parseFloat(formData.mensal);
+    if (isNaN(diaria) || isNaN(mensal)) {
       Alert.alert('Erro', 'Valores inválidos');
       return;
     }
 
-    if (editingOffer) {
-      updateMutation.mutate({
-        userId: user!.id,
-        offerId: editingOffer,
-        name: formData.name,
-        brand: formData.brand,
-        model: formData.model,
-        dailyRate,
-        monthlyRate,
-      });
-    } else {
-      createMutation.mutate({
-        userId: user!.id,
-        name: formData.name,
-        brand: formData.brand,
-        model: formData.model,
-        dailyRate,
-        monthlyRate,
-      });
+    setIsSaving(true);
+    try {
+      if (editingOffer) {
+        await atualizarMaquina(editingOffer, {
+          nome: formData.nome,
+          marca: formData.marca,
+          modelo: formData.modelo,
+          diaria,
+          mensal,
+        });
+      } else {
+        await criarMaquina({
+          tipo: 'locacao',
+          nome: formData.nome,
+          marca: formData.marca,
+          modelo: formData.modelo,
+          diaria,
+          mensal,
+        });
+      }
+      setIsModalVisible(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving rental offer:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao salvar a oferta');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -149,45 +119,51 @@ export default function RentalScreen() {
         {
           text: 'Excluir',
           style: 'destructive',
-          onPress: () => removeMutation.mutate({ userId: user!.id, offerId: id }),
+          onPress: async () => {
+            await removerMaquina(id);
+          },
         },
       ]
     );
   };
 
-  const handleRequestRental = async (offerId: string) => {
+  const handleRequestRental = async (machine: any) => {
     if (!user) return;
 
+    setIsRequesting(true);
     try {
-      const ticketResponse = await createTicketMutation.mutateAsync({
-        userId: user.id,
-        type: 'rental_request',
-        area: 'locacao',
-        payload: { rentalOfferId: offerId },
+      const conversaId = await criarConversa({
+        area: 'Locação',
+        titulo: `Locação - ${machine.nome}`,
+        mensagemInicial: `Olá, gostaria de solicitar a locação de ${machine.nome} - ${machine.marca} ${machine.modelo}.`,
       });
 
-      await createConversationMutation.mutateAsync({
-        userId: user.id,
-        ticketId: ticketResponse.id,
-      });
+      if (conversaId) {
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a solicitação');
+      }
     } catch (error) {
       console.error('Error requesting rental:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao solicitar a locação');
+    } finally {
+      setIsRequesting(false);
     }
   };
 
   const renderOffer = ({ item }: any) => (
     <View style={styles.offerCard}>
       <View style={styles.offerInfo}>
-        <Text style={styles.offerName}>{item.name}</Text>
+        <Text style={styles.offerName}>{item.nome}</Text>
         <Text style={styles.offerDetails}>
-          {item.brand} - {item.model}
+          {item.marca} - {item.modelo}
         </Text>
         <View style={styles.priceContainer}>
           <Text style={styles.offerPrice}>
-            Diária: R$ {item.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            Diária: R$ {item.diaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
           <Text style={styles.offerPrice}>
-            Mensal: R$ {item.monthlyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            Mensal: R$ {item.mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
         </View>
       </View>
@@ -211,8 +187,8 @@ export default function RentalScreen() {
         ) : (
           <TouchableOpacity
             style={[styles.actionButton, styles.requestButton]}
-            onPress={() => handleRequestRental(item.id)}
-            disabled={createTicketMutation.isPending || createConversationMutation.isPending}
+            onPress={() => handleRequestRental(item)}
+            disabled={isRequesting}
           >
             <Calendar size={18} color="#fff" />
             <Text style={styles.requestButtonText}>Solicitar</Text>
@@ -222,7 +198,7 @@ export default function RentalScreen() {
     </View>
   );
 
-  if (offersQuery.isLoading) {
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -246,7 +222,7 @@ export default function RentalScreen() {
       />
 
       <FlatList
-        data={offersQuery.data || []}
+        data={maquinas}
         keyExtractor={(item) => item.id}
         renderItem={renderOffer}
         contentContainerStyle={styles.listContainer}
@@ -285,32 +261,32 @@ export default function RentalScreen() {
             <Text style={styles.label}>Nome</Text>
             <TextInput
               style={styles.input}
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              value={formData.nome}
+              onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Empilhadeira para Locação"
             />
 
             <Text style={styles.label}>Marca</Text>
             <TextInput
               style={styles.input}
-              value={formData.brand}
-              onChangeText={(text) => setFormData({ ...formData, brand: text })}
+              value={formData.marca}
+              onChangeText={(text) => setFormData({ ...formData, marca: text })}
               placeholder="Ex: Heli"
             />
 
             <Text style={styles.label}>Modelo</Text>
             <TextInput
               style={styles.input}
-              value={formData.model}
-              onChangeText={(text) => setFormData({ ...formData, model: text })}
+              value={formData.modelo}
+              onChangeText={(text) => setFormData({ ...formData, modelo: text })}
               placeholder="Ex: CPD25"
             />
 
             <Text style={styles.label}>Diária (R$)</Text>
             <TextInput
               style={styles.input}
-              value={formData.dailyRate}
-              onChangeText={(text) => setFormData({ ...formData, dailyRate: text })}
+              value={formData.diaria}
+              onChangeText={(text) => setFormData({ ...formData, diaria: text })}
               placeholder="Ex: 250.00"
               keyboardType="numeric"
             />
@@ -318,22 +294,18 @@ export default function RentalScreen() {
             <Text style={styles.label}>Mensal (R$)</Text>
             <TextInput
               style={styles.input}
-              value={formData.monthlyRate}
-              onChangeText={(text) => setFormData({ ...formData, monthlyRate: text })}
+              value={formData.mensal}
+              onChangeText={(text) => setFormData({ ...formData, mensal: text })}
               placeholder="Ex: 5000.00"
               keyboardType="numeric"
             />
 
             <TouchableOpacity
-              style={[
-                styles.submitButton,
-                (createMutation.isPending || updateMutation.isPending) &&
-                  styles.submitButtonDisabled,
-              ]}
+              style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             >
-              {createMutation.isPending || updateMutation.isPending ? (
+              {isSaving ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>
