@@ -273,6 +273,7 @@ export default function SalesScreen() {
               value={formData.nome}
               onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Empilhadeira Elétrica"
+              placeholderTextColor={Colors.textLight}
             />
 
             <Text style={styles.label}>Marca</Text>
@@ -281,6 +282,7 @@ export default function SalesScreen() {
               value={formData.marca}
               onChangeText={(text) => setFormData({ ...formData, marca: text })}
               placeholder="Ex: Heli"
+              placeholderTextColor={Colors.textLight}
             />
 
             <Text style={styles.label}>Modelo</Text>
@@ -289,6 +291,7 @@ export default function SalesScreen() {
               value={formData.modelo}
               onChangeText={(text) => setFormData({ ...formData, modelo: text })}
               placeholder="Ex: CPD18"
+              placeholderTextColor={Colors.textLight}
             />
 
             <Text style={styles.label}>Preço (R$)</Text>
@@ -298,6 +301,7 @@ export default function SalesScreen() {
               onChangeText={(text) => setFormData({ ...formData, preco: text })}
               placeholder="Ex: 85000.00"
               keyboardType="numeric"
+              placeholderTextColor={Colors.textLight}
             />
 
             {canEdit && (
@@ -309,6 +313,7 @@ export default function SalesScreen() {
                     value={formData.imageUrl}
                     onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
                     placeholder="Ex: https://exemplo.com/imagem.jpg"
+                    placeholderTextColor={Colors.textLight}
                   />
                   {formData.imageUrl && (
                     <TouchableOpacity
@@ -363,7 +368,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   machineCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -376,6 +381,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   machineImage: {
     width: 80,
@@ -423,7 +430,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   deleteButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: Colors.error,
   },
   quoteButton: {
     backgroundColor: Colors.primary,
@@ -432,7 +439,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   quoteButtonText: {
-    color: '#fff',
+    color: Colors.text,
     fontSize: 14,
     fontWeight: '600' as const,
   },
@@ -454,7 +461,7 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: 20,
@@ -491,12 +498,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: Colors.text,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   submitButton: {
     backgroundColor: Colors.primary,
@@ -510,7 +518,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
-    color: '#fff',
+    color: Colors.text,
     fontSize: 16,
     fontWeight: '700' as const,
   },

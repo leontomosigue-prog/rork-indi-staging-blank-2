@@ -188,6 +188,7 @@ export default function ChatScreen() {
             value={messageText}
             onChangeText={setMessageText}
             placeholder="Digite uma mensagem..."
+            placeholderTextColor={Colors.textLight}
             multiline
             maxLength={1000}
           />
@@ -254,9 +255,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   otherMessageBubble: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   senderName: {
     fontSize: 13,
@@ -304,9 +305,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row' as const,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: Colors.border,
     alignItems: 'flex-end' as const,
   },
   input: {
@@ -316,6 +317,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
+    color: Colors.text,
     maxHeight: 100,
     marginRight: 8,
   },
@@ -336,9 +338,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
     gap: 8,
     padding: 16,
-    backgroundColor: '#d1fae5',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderTopWidth: 1,
-    borderTopColor: '#10b981',
+    borderTopColor: Colors.success,
   },
   resolvedText: {
     fontSize: 14,

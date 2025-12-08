@@ -118,9 +118,9 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 24,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: Colors.border,
   },
   title: {
     fontSize: 28,
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   conversaCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -147,6 +147,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   iconContainer: {
     width: 48,
@@ -179,7 +181,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   priorityBadge: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
   priorityText: {
     fontSize: 10,
     fontWeight: '600' as const,
-    color: '#f59e0b',
+    color: Colors.warning,
   },
   emptyContainer: {
     flex: 1,
