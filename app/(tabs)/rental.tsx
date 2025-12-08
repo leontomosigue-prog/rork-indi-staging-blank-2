@@ -9,9 +9,11 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { Plus, Edit2, Trash2, Calendar } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Calendar, ImageIcon, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -22,6 +24,7 @@ interface RentalFormData {
   modelo: string;
   diaria: string;
   mensal: string;
+  imageUrl: string;
 }
 
 export default function RentalScreen() {
@@ -36,6 +39,7 @@ export default function RentalScreen() {
     modelo: '',
     diaria: '',
     mensal: '',
+    imageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
@@ -48,7 +52,7 @@ export default function RentalScreen() {
   const canViewOnly = hasRentalRole && !isAdmin;
 
   const resetForm = () => {
-    setFormData({ nome: '', marca: '', modelo: '', diaria: '', mensal: '' });
+    setFormData({ nome: '', marca: '', modelo: '', diaria: '', mensal: '', imageUrl: '' });
     setEditingOffer(null);
   };
 
@@ -61,6 +65,7 @@ export default function RentalScreen() {
         modelo: offer.modelo,
         diaria: offer.diaria.toString(),
         mensal: offer.mensal.toString(),
+        imageUrl: offer.imageUrl || '',
       });
     } else {
       resetForm();
@@ -90,6 +95,7 @@ export default function RentalScreen() {
           modelo: formData.modelo,
           diaria,
           mensal,
+          imageUrl: formData.imageUrl || undefined,
         });
       } else {
         await criarMaquina({
@@ -99,6 +105,7 @@ export default function RentalScreen() {
           modelo: formData.modelo,
           diaria,
           mensal,
+          imageUrl: formData.imageUrl || undefined,
         });
       }
       setIsModalVisible(false);
@@ -154,6 +161,18 @@ export default function RentalScreen() {
 
   const renderOffer = ({ item }: any) => (
     <View style={styles.offerCard}>
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.offerImage}
+          contentFit="cover"
+          placeholder={require('@/assets/images/icon.png')}
+        />
+      ) : (
+        <View style={styles.offerImagePlaceholder}>
+          <ImageIcon size={32} color={Colors.textLight} />
+        </View>
+      )}
       <View style={styles.offerInfo}>
         <Text style={styles.offerName}>{item.nome}</Text>
         <Text style={styles.offerDetails}>
@@ -258,7 +277,7 @@ export default function RentalScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.form}>
+          <ScrollView style={styles.form}>
             <Text style={styles.label}>Nome</Text>
             <TextInput
               style={styles.input}
@@ -301,6 +320,35 @@ export default function RentalScreen() {
               keyboardType="numeric"
             />
 
+            {canEdit && (
+              <>
+                <Text style={styles.label}>URL da Imagem (opcional)</Text>
+                <View style={styles.imageInputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.imageUrl}
+                    onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
+                    placeholder="Ex: https://exemplo.com/imagem.jpg"
+                  />
+                  {formData.imageUrl && (
+                    <TouchableOpacity
+                      style={styles.clearImageButton}
+                      onPress={() => setFormData({ ...formData, imageUrl: '' })}
+                    >
+                      <X size={20} color={Colors.textLight} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {formData.imageUrl && (
+                  <Image
+                    source={{ uri: formData.imageUrl }}
+                    style={styles.imagePreview}
+                    contentFit="cover"
+                  />
+                )}
+              </>
+            )}
+
             <TouchableOpacity
               style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={handleSubmit}
@@ -314,7 +362,7 @@ export default function RentalScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -337,7 +385,7 @@ const styles = StyleSheet.create({
   offerCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -347,6 +395,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    gap: 12,
+  },
+  offerImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  offerImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   offerInfo: {
     flex: 1,
@@ -427,7 +489,22 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   form: {
+    flex: 1,
     padding: 16,
+  },
+  imageInputContainer: {
+    position: 'relative' as const,
+  },
+  clearImageButton: {
+    position: 'absolute' as const,
+    right: 12,
+    top: 12,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 12,
   },
   label: {
     fontSize: 14,
@@ -450,6 +527,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center' as const,
     marginTop: 24,
+    marginBottom: 32,
   },
   submitButtonDisabled: {
     opacity: 0.6,

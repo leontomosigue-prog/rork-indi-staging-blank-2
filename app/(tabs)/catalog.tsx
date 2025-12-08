@@ -11,8 +11,9 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
-import { Plus, Edit2, Trash2, Package, Truck, ShoppingBag } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Package, Truck, ShoppingBag, ImageIcon } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -26,6 +27,7 @@ interface MachineFormData {
   preco: string;
   diaria: string;
   mensal: string;
+  imageUrl: string;
 }
 
 interface PartFormData {
@@ -34,6 +36,7 @@ interface PartFormData {
   categoria: 'hidraulica' | 'motor' | 'eletrica' | 'outros';
   preco: string;
   estoque: string;
+  imageUrl: string;
 }
 
 const CATEGORIES = [
@@ -67,6 +70,7 @@ export default function CatalogScreen() {
     preco: '',
     diaria: '',
     mensal: '',
+    imageUrl: '',
   });
   const [partFormData, setPartFormData] = useState<PartFormData>({
     sku: '',
@@ -74,6 +78,7 @@ export default function CatalogScreen() {
     categoria: 'outros',
     preco: '',
     estoque: '',
+    imageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -84,12 +89,12 @@ export default function CatalogScreen() {
   const pecas = listPecas();
 
   const resetMachineForm = () => {
-    setMachineFormData({ nome: '', marca: '', modelo: '', preco: '', diaria: '', mensal: '' });
+    setMachineFormData({ nome: '', marca: '', modelo: '', preco: '', diaria: '', mensal: '', imageUrl: '' });
     setEditingId(null);
   };
 
   const resetPartForm = () => {
-    setPartFormData({ sku: '', nome: '', categoria: 'outros', preco: '', estoque: '' });
+    setPartFormData({ sku: '', nome: '', categoria: 'outros', preco: '', estoque: '', imageUrl: '' });
     setEditingId(null);
   };
 
@@ -103,6 +108,7 @@ export default function CatalogScreen() {
         preco: machine.preco?.toString() || '',
         diaria: machine.diaria?.toString() || '',
         mensal: machine.mensal?.toString() || '',
+        imageUrl: machine.imageUrl || '',
       });
     } else {
       resetMachineForm();
@@ -119,6 +125,7 @@ export default function CatalogScreen() {
         categoria: part.categoria,
         preco: part.preco.toString(),
         estoque: part.estoque.toString(),
+        imageUrl: part.imageUrl || '',
       });
     } else {
       resetPartForm();
@@ -169,6 +176,10 @@ export default function CatalogScreen() {
         data.mensal = mensal;
       }
 
+      if (machineFormData.imageUrl) {
+        data.imageUrl = machineFormData.imageUrl;
+      }
+
       if (editingId) {
         await atualizarMaquina(editingId, data);
       } else {
@@ -207,6 +218,7 @@ export default function CatalogScreen() {
           categoria: partFormData.categoria,
           preco,
           estoque,
+          imageUrl: partFormData.imageUrl || undefined,
         });
       } else {
         await criarPeca({
@@ -215,6 +227,7 @@ export default function CatalogScreen() {
           categoria: partFormData.categoria,
           preco,
           estoque,
+          imageUrl: partFormData.imageUrl || undefined,
         });
       }
       setIsModalVisible(false);
@@ -255,6 +268,18 @@ export default function CatalogScreen() {
 
   const renderMachine = ({ item }: any) => (
     <View style={styles.itemCard}>
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.itemImage}
+          contentFit="cover"
+          placeholder={require('@/assets/images/icon.png')}
+        />
+      ) : (
+        <View style={styles.itemImagePlaceholder}>
+          <ImageIcon size={28} color={Colors.textLight} />
+        </View>
+      )}
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.nome}</Text>
         <Text style={styles.itemDetails}>
@@ -300,6 +325,18 @@ export default function CatalogScreen() {
 
   const renderPart = ({ item }: any) => (
     <View style={styles.itemCard}>
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.itemImage}
+          contentFit="cover"
+          placeholder={require('@/assets/images/icon.png')}
+        />
+      ) : (
+        <View style={styles.itemImagePlaceholder}>
+          <ImageIcon size={28} color={Colors.textLight} />
+        </View>
+      )}
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.nome}</Text>
         <Text style={styles.itemSku}>SKU: {item.sku}</Text>
@@ -582,6 +619,27 @@ export default function CatalogScreen() {
               </>
             )}
 
+            <Text style={styles.label}>URL da Imagem (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              value={activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl}
+              onChangeText={(text) =>
+                activeTab === 'pecas'
+                  ? setPartFormData({ ...partFormData, imageUrl: text })
+                  : setMachineFormData({ ...machineFormData, imageUrl: text })
+              }
+              placeholder="Ex: https://exemplo.com/imagem.jpg"
+            />
+            {(activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl) && (
+              <Image
+                source={{
+                  uri: activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl,
+                }}
+                style={styles.imagePreview}
+                contentFit="cover"
+              />
+            )}
+
             <TouchableOpacity
               style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={activeTab === 'pecas' ? handleSubmitPart : handleSubmitMachine}
@@ -647,7 +705,7 @@ const styles = StyleSheet.create({
   itemCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -657,6 +715,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    gap: 12,
+  },
+  itemImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+  },
+  itemImagePlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   itemInfo: {
     flex: 1,
@@ -788,6 +860,12 @@ const styles = StyleSheet.create({
   categoryOptionTextActive: {
     color: '#fff',
     fontWeight: '600' as const,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 12,
   },
   submitButton: {
     backgroundColor: Colors.primary,

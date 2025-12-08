@@ -11,8 +11,9 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { Plus, Edit2, Trash2, Package, Search } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -23,6 +24,7 @@ interface PartFormData {
   categoria: 'hidraulica' | 'motor' | 'eletrica' | 'outros';
   preco: string;
   estoque: string;
+  imageUrl: string;
 }
 
 const CATEGORIES = [
@@ -46,6 +48,7 @@ export default function PartsScreen() {
     categoria: 'outros',
     preco: '',
     estoque: '',
+    imageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
@@ -77,7 +80,7 @@ export default function PartsScreen() {
   }, [pecas, searchText, selectedCategory]);
 
   const resetForm = () => {
-    setFormData({ sku: '', nome: '', categoria: 'outros', preco: '', estoque: '' });
+    setFormData({ sku: '', nome: '', categoria: 'outros', preco: '', estoque: '', imageUrl: '' });
     setEditingPart(null);
   };
 
@@ -90,6 +93,7 @@ export default function PartsScreen() {
         categoria: part.categoria,
         preco: part.preco.toString(),
         estoque: part.estoque.toString(),
+        imageUrl: part.imageUrl || '',
       });
     } else {
       resetForm();
@@ -119,6 +123,7 @@ export default function PartsScreen() {
           categoria: formData.categoria,
           preco,
           estoque,
+          imageUrl: formData.imageUrl || undefined,
         });
       } else {
         await criarPeca({
@@ -127,6 +132,7 @@ export default function PartsScreen() {
           categoria: formData.categoria,
           preco,
           estoque,
+          imageUrl: formData.imageUrl || undefined,
         });
       }
       setIsModalVisible(false);
@@ -187,6 +193,18 @@ export default function PartsScreen() {
 
   const renderPart = ({ item }: any) => (
     <View style={styles.partCard}>
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.partImage}
+          contentFit="cover"
+          placeholder={require('@/assets/images/icon.png')}
+        />
+      ) : (
+        <View style={styles.partImagePlaceholder}>
+          <ImageIcon size={28} color={Colors.textLight} />
+        </View>
+      )}
       <View style={styles.partInfo}>
         <Text style={styles.partName}>{item.nome}</Text>
         <Text style={styles.partSku}>SKU: {item.sku}</Text>
@@ -392,6 +410,35 @@ export default function PartsScreen() {
               keyboardType="numeric"
             />
 
+            {canEdit && (
+              <>
+                <Text style={styles.label}>URL da Imagem (opcional)</Text>
+                <View style={styles.imageInputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.imageUrl}
+                    onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
+                    placeholder="Ex: https://exemplo.com/imagem.jpg"
+                  />
+                  {formData.imageUrl && (
+                    <TouchableOpacity
+                      style={styles.clearImageButton}
+                      onPress={() => setFormData({ ...formData, imageUrl: '' })}
+                    >
+                      <X size={20} color={Colors.textLight} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {formData.imageUrl && (
+                  <Image
+                    source={{ uri: formData.imageUrl }}
+                    style={styles.imagePreview}
+                    contentFit="cover"
+                  />
+                )}
+              </>
+            )}
+
             <TouchableOpacity
               style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={handleSubmit}
@@ -475,7 +522,7 @@ const styles = StyleSheet.create({
   partCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -485,6 +532,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    gap: 12,
+  },
+  partImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+  },
+  partImagePlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   partInfo: {
     flex: 1,
@@ -619,6 +680,20 @@ const styles = StyleSheet.create({
   categoryOptionTextActive: {
     color: '#fff',
     fontWeight: '600' as const,
+  },
+  imageInputContainer: {
+    position: 'relative' as const,
+  },
+  clearImageButton: {
+    position: 'absolute' as const,
+    right: 12,
+    top: 12,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 12,
   },
   submitButton: {
     backgroundColor: Colors.primary,

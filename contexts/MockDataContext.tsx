@@ -39,6 +39,7 @@ type Maquina = {
   preco?: number;
   diaria?: number;
   mensal?: number;
+  imageUrl?: string;
 };
 
 type Peca = {
@@ -48,6 +49,7 @@ type Peca = {
   categoria: 'hidraulica' | 'motor' | 'eletrica' | 'outros';
   preco: number;
   estoque: number;
+  imageUrl?: string;
 };
 
 const STORAGE_KEYS = {
@@ -67,6 +69,7 @@ const MOCK_MAQUINAS_VENDAS: Maquina[] = [
     marca: 'Heli',
     modelo: 'CPD18',
     preco: 85000,
+    imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400',
   },
   {
     id: 'mv2',
@@ -75,6 +78,7 @@ const MOCK_MAQUINAS_VENDAS: Maquina[] = [
     marca: 'Toyota',
     modelo: '8FG30',
     preco: 120000,
+    imageUrl: 'https://images.unsplash.com/photo-1590859808308-3d2d9c515b1a?w=400',
   },
   {
     id: 'mv3',
@@ -83,6 +87,7 @@ const MOCK_MAQUINAS_VENDAS: Maquina[] = [
     marca: 'Crown',
     modelo: 'RC5500',
     preco: 75000,
+    imageUrl: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=400',
   },
 ];
 
@@ -95,6 +100,7 @@ const MOCK_MAQUINAS_LOCACAO: Maquina[] = [
     modelo: 'CPD25',
     diaria: 250,
     mensal: 5000,
+    imageUrl: 'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=400',
   },
   {
     id: 'ml2',
@@ -104,6 +110,7 @@ const MOCK_MAQUINAS_LOCACAO: Maquina[] = [
     modelo: 'ERP18',
     diaria: 200,
     mensal: 4000,
+    imageUrl: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=400',
   },
 ];
 
@@ -115,6 +122,7 @@ const MOCK_PECAS: Peca[] = [
     categoria: 'hidraulica',
     preco: 150,
     estoque: 10,
+    imageUrl: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
   },
   {
     id: 'p2',
@@ -123,6 +131,7 @@ const MOCK_PECAS: Peca[] = [
     categoria: 'eletrica',
     preco: 350,
     estoque: 5,
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400',
   },
   {
     id: 'p3',
@@ -131,6 +140,7 @@ const MOCK_PECAS: Peca[] = [
     categoria: 'motor',
     preco: 80,
     estoque: 20,
+    imageUrl: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400',
   },
   {
     id: 'p4',
@@ -139,6 +149,7 @@ const MOCK_PECAS: Peca[] = [
     categoria: 'hidraulica',
     preco: 1500,
     estoque: 3,
+    imageUrl: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400',
   },
 ];
 
