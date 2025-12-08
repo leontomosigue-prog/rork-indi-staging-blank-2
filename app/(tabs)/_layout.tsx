@@ -1,9 +1,137 @@
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { Home, User, ShoppingBag, MessageSquare, Truck, Wrench, Package } from "lucide-react-native";
 import React from "react";
 import Colors from "@/constants/Colors";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function TabLayout() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!user) {
+    return <Redirect href="/login" />;
+  }
+
+  const isAdmin = user.roles?.includes('Admin');
+  const isEmployee = user.type === 'employee';
+
+  if (isAdmin) {
+    return (
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors.primary,
+          headerShown: true,
+        }}
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: "Início",
+            tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="sales"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="rental"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="parts"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="technical"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="messages"
+          options={{
+            title: "Mensagens",
+            tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Perfil",
+            tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          }}
+        />
+      </Tabs>
+    );
+  }
+
+  if (isEmployee) {
+    return (
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors.primary,
+          headerShown: true,
+        }}
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: "Início",
+            tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="sales"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="rental"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="parts"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="technical"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="messages"
+          options={{
+            title: "Mensagens",
+            tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Perfil",
+            tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          }}
+        />
+      </Tabs>
+    );
+  }
+
   return (
     <Tabs
       screenOptions={{

@@ -138,23 +138,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         return false;
       }
       
-      const isEmployee = normalizedEmail.endsWith('@indi.com.br');
-      const userType = isEmployee ? 'employee' : 'client';
-      const roles = isEmployee ? ['Vendas'] : [];
+      const mockUser = MOCK_USERS.find(u => u.email.toLowerCase() === normalizedEmail);
       
-      const mockUser: User = {
-        id: '1',
-        type: userType,
-        email: normalizedEmail,
-        fullName: 'Usuário de Teste',
-        roles: roles as any,
-        lgpdConsent: true,
-        lgpdConsentDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      if (!mockUser) {
+        console.log('🔴 LOGIN MOCK: Email not found in mock users');
+        return false;
+      }
       
-      console.log('🔵 LOGIN MOCK user created:', JSON.stringify(mockUser, null, 2));
+      console.log('🔵 LOGIN MOCK user found:', JSON.stringify(mockUser, null, 2));
       console.log('🔵 LOGIN MOCK setUser call...');
       setUser(mockUser);
       console.log('🔵 LOGIN MOCK setUser OK');
