@@ -1,5 +1,5 @@
 import { Tabs, Redirect } from "expo-router";
-import { Home, User, ShoppingBag, MessageSquare, Truck, Wrench, Package } from "lucide-react-native";
+import { Home, User, ShoppingBag, MessageSquare, Truck, Wrench, Package, BookOpen, Users, UserCircle, ClipboardList } from "lucide-react-native";
 import React from "react";
 import Colors from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +34,48 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="catalog"
+          options={{
+            title: "Catálogo",
+            tabBarIcon: ({ color }) => <BookOpen size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="employees"
+          options={{
+            title: "Colaboradores",
+            tabBarIcon: ({ color }) => <Users size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="clients"
+          options={{
+            title: "Clientes",
+            tabBarIcon: ({ color }) => <UserCircle size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="tickets"
+          options={{
+            title: "Chamados",
+            tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="messages"
+          options={{
+            title: "Mensagens",
+            tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Perfil",
+            tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="sales"
           options={{
             href: null,
@@ -55,20 +97,6 @@ export default function TabLayout() {
           name="technical"
           options={{
             href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="messages"
-          options={{
-            title: "Mensagens",
-            tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: "Perfil",
-            tabBarIcon: ({ color }) => <User size={24} color={color} />,
           }}
         />
       </Tabs>
@@ -91,6 +119,27 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="tickets"
+          options={{
+            title: "Chamados",
+            tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="messages"
+          options={{
+            title: "Mensagens",
+            tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Perfil",
+            tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="sales"
           options={{
             href: null,
@@ -115,17 +164,21 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="messages"
+          name="catalog"
           options={{
-            title: "Mensagens",
-            tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
+            href: null,
           }}
         />
         <Tabs.Screen
-          name="profile"
+          name="employees"
           options={{
-            title: "Perfil",
-            tabBarIcon: ({ color }) => <User size={24} color={color} />,
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="clients"
+          options={{
+            href: null,
           }}
         />
       </Tabs>
@@ -186,6 +239,30 @@ export default function TabLayout() {
         options={{
           title: "Perfil",
           tabBarIcon: ({ color }) => <User size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="catalog"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="employees"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="tickets"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
