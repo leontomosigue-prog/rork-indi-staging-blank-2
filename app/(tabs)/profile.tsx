@@ -1,6 +1,7 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Image, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { User, Settings, Building2, Shield, TrendingUp, MessageSquare, CheckCircle2 } from 'lucide-react-native';
+import { User, Settings, Building2, Shield, TrendingUp, MessageSquare, CheckCircle2, Camera, X } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
@@ -10,6 +11,7 @@ export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const { conversas } = useMockData();
   const [biometriaAtiva, setBiometriaAtiva] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -24,6 +26,71 @@ export default function ProfileScreen() {
 
   const handleChangePassword = () => {
     console.log('Navegando para tela de troca de senha');
+  };
+
+  const pickImage = async () => {
+    console.log('ProfileScreen: Solicitando permissão para acessar galeria');
+    
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'É necessário permitir o acesso à galeria para alterar a foto de perfil.');
+        return;
+      }
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'] as any,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      console.log('ProfileScreen: Resultado da seleção de imagem:', result);
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        console.log('ProfileScreen: Imagem selecionada:', imageUri);
+        
+        setIsUploadingPhoto(true);
+        const success = await updateUser({ profileImageUrl: imageUri });
+        setIsUploadingPhoto(false);
+        
+        if (success) {
+          console.log('ProfileScreen: Foto de perfil atualizada com sucesso');
+        } else {
+          Alert.alert('Erro', 'Não foi possível atualizar a foto de perfil.');
+        }
+      }
+    } catch (error) {
+      console.error('ProfileScreen: Erro ao selecionar imagem:', error);
+      setIsUploadingPhoto(false);
+      Alert.alert('Erro', 'Ocorreu um erro ao selecionar a imagem.');
+    }
+  };
+
+  const removeProfileImage = async () => {
+    Alert.alert(
+      'Remover foto',
+      'Deseja remover sua foto de perfil?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            console.log('ProfileScreen: Removendo foto de perfil');
+            const success = await updateUser({ profileImageUrl: undefined });
+            if (success) {
+              console.log('ProfileScreen: Foto de perfil removida com sucesso');
+            } else {
+              Alert.alert('Erro', 'Não foi possível remover a foto de perfil.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getInitials = (name: string) => {
@@ -59,10 +126,34 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>{getInitials(user?.fullName || '')}</Text>
+        <View style={styles.avatarWrapper}>
+          <Pressable onPress={pickImage} disabled={isUploadingPhoto}>
+            {user?.profileImageUrl ? (
+              <Image
+                source={{ uri: user.profileImageUrl }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatarContainer}>
+                <Text style={styles.avatarText}>{getInitials(user?.fullName || '')}</Text>
+              </View>
+            )}
+            <View style={styles.cameraIconContainer}>
+              <Camera size={18} color={Colors.surface} />
+            </View>
+          </Pressable>
+          {user?.profileImageUrl && (
+            <Pressable style={styles.removePhotoButton} onPress={removeProfileImage}>
+              <X size={16} color={Colors.surface} />
+            </Pressable>
+          )}
         </View>
         <Text style={styles.name}>{user?.fullName}</Text>
+        <Pressable onPress={pickImage} disabled={isUploadingPhoto}>
+          <Text style={styles.changePhotoText}>
+            {isUploadingPhoto ? 'Carregando...' : 'Alterar foto'}
+          </Text>
+        </Pressable>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
             {isEmployee ? 'Colaborador INDI' : 'Cliente INDI'}
@@ -240,19 +331,59 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 12,
+  },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   avatarText: {
     fontSize: 32,
     fontWeight: '700' as const,
     color: Colors.surface,
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: Colors.surface,
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: 0,
+    right: -8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  changePhotoText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.primary,
+    marginBottom: 8,
   },
   name: {
     fontSize: 24,

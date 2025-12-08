@@ -19,6 +19,7 @@ export interface User {
   companyName?: string;
   cnpj?: string;
   roles?: Role[];
+  profileImageUrl?: string;
   lgpdConsent: boolean;
   lgpdConsentDate: string;
   createdAt: string;
