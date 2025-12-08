@@ -40,9 +40,10 @@ export default function SalesScreen() {
 
   const maquinas = listMaquinas('venda');
 
-  const hasAdminOrSalesRole = user?.roles?.some(
-    (role) => role === 'Admin' || role === 'Vendas'
-  );
+  const isAdmin = user?.roles?.includes('Admin');
+  const hasSalesRole = user?.roles?.includes('Vendas');
+  const canEdit = isAdmin;
+  const canViewOnly = hasSalesRole && !isAdmin;
 
   const resetForm = () => {
     setFormData({ nome: '', marca: '', modelo: '', preco: '' });
@@ -158,7 +159,7 @@ export default function SalesScreen() {
       </View>
 
       <View style={styles.actions}>
-        {hasAdminOrSalesRole ? (
+        {canEdit ? (
           <>
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
@@ -173,7 +174,7 @@ export default function SalesScreen() {
               <Trash2 size={18} color="#fff" />
             </TouchableOpacity>
           </>
-        ) : (
+        ) : !canViewOnly ? (
           <TouchableOpacity
             style={[styles.actionButton, styles.quoteButton]}
             onPress={() => handleRequestQuote(item)}
@@ -182,7 +183,7 @@ export default function SalesScreen() {
             <ShoppingCart size={18} color="#fff" />
             <Text style={styles.quoteButtonText}>Orçamento</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -200,7 +201,7 @@ export default function SalesScreen() {
       <Stack.Screen
         options={{
           title: 'Vendas',
-          headerRight: hasAdminOrSalesRole
+          headerRight: canEdit
             ? () => (
                 <TouchableOpacity onPress={() => handleOpenModal()}>
                   <Plus size={24} color={Colors.primary} />

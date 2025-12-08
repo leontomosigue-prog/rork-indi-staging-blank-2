@@ -42,9 +42,10 @@ export default function RentalScreen() {
 
   const maquinas = listMaquinas('locacao');
 
-  const hasAdminOrRentalRole = user?.roles?.some(
-    (role) => role === 'Admin' || role === 'Locação'
-  );
+  const isAdmin = user?.roles?.includes('Admin');
+  const hasRentalRole = user?.roles?.includes('Locação');
+  const canEdit = isAdmin;
+  const canViewOnly = hasRentalRole && !isAdmin;
 
   const resetForm = () => {
     setFormData({ nome: '', marca: '', modelo: '', diaria: '', mensal: '' });
@@ -169,7 +170,7 @@ export default function RentalScreen() {
       </View>
 
       <View style={styles.actions}>
-        {hasAdminOrRentalRole ? (
+        {canEdit ? (
           <>
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
@@ -184,7 +185,7 @@ export default function RentalScreen() {
               <Trash2 size={18} color="#fff" />
             </TouchableOpacity>
           </>
-        ) : (
+        ) : !canViewOnly ? (
           <TouchableOpacity
             style={[styles.actionButton, styles.requestButton]}
             onPress={() => handleRequestRental(item)}
@@ -193,7 +194,7 @@ export default function RentalScreen() {
             <Calendar size={18} color="#fff" />
             <Text style={styles.requestButtonText}>Solicitar</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -211,7 +212,7 @@ export default function RentalScreen() {
       <Stack.Screen
         options={{
           title: 'Locação',
-          headerRight: hasAdminOrRentalRole
+          headerRight: canEdit
             ? () => (
                 <TouchableOpacity onPress={() => handleOpenModal()}>
                   <Plus size={24} color={Colors.primary} />

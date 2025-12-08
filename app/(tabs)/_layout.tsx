@@ -104,6 +104,10 @@ export default function TabLayout() {
   }
 
   if (isEmployee) {
+    const hasSalesRole = user.roles?.includes('Vendas');
+    const hasRentalRole = user.roles?.includes('Locação');
+    const hasPartsRole = user.roles?.includes('Peças');
+
     return (
       <Tabs
         screenOptions={{
@@ -132,6 +136,33 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} />,
           }}
         />
+        {hasSalesRole && (
+          <Tabs.Screen
+            name="sales"
+            options={{
+              title: "Vendas",
+              tabBarIcon: ({ color }) => <ShoppingBag size={24} color={color} />,
+            }}
+          />
+        )}
+        {hasRentalRole && (
+          <Tabs.Screen
+            name="rental"
+            options={{
+              title: "Locação",
+              tabBarIcon: ({ color }) => <Truck size={24} color={color} />,
+            }}
+          />
+        )}
+        {hasPartsRole && (
+          <Tabs.Screen
+            name="parts"
+            options={{
+              title: "Peças",
+              tabBarIcon: ({ color }) => <Package size={24} color={color} />,
+            }}
+          />
+        )}
         <Tabs.Screen
           name="profile"
           options={{
@@ -139,24 +170,30 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <User size={24} color={color} />,
           }}
         />
-        <Tabs.Screen
-          name="sales"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="rental"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="parts"
-          options={{
-            href: null,
-          }}
-        />
+        {!hasSalesRole && (
+          <Tabs.Screen
+            name="sales"
+            options={{
+              href: null,
+            }}
+          />
+        )}
+        {!hasRentalRole && (
+          <Tabs.Screen
+            name="rental"
+            options={{
+              href: null,
+            }}
+          />
+        )}
+        {!hasPartsRole && (
+          <Tabs.Screen
+            name="parts"
+            options={{
+              href: null,
+            }}
+          />
+        )}
         <Tabs.Screen
           name="technical"
           options={{

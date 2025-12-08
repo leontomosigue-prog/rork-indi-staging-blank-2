@@ -52,9 +52,10 @@ export default function PartsScreen() {
 
   const pecas = listPecas();
 
-  const hasAdminOrPartsRole = user?.roles?.some(
-    (role) => role === 'Admin' || role === 'Peças'
-  );
+  const isAdmin = user?.roles?.includes('Admin');
+  const hasPartsRole = user?.roles?.includes('Peças');
+  const canEdit = isAdmin;
+  const canViewOnly = hasPartsRole && !isAdmin;
 
   const filteredParts = useMemo(() => {
     let result = pecas;
@@ -199,7 +200,7 @@ export default function PartsScreen() {
       </View>
 
       <View style={styles.actions}>
-        {hasAdminOrPartsRole ? (
+        {canEdit ? (
           <>
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
@@ -214,7 +215,7 @@ export default function PartsScreen() {
               <Trash2 size={18} color="#fff" />
             </TouchableOpacity>
           </>
-        ) : (
+        ) : !canViewOnly ? (
           <TouchableOpacity
             style={[styles.actionButton, styles.requestButton]}
             onPress={() => handleRequestPart(item)}
@@ -223,7 +224,7 @@ export default function PartsScreen() {
             <Package size={18} color="#fff" />
             <Text style={styles.requestButtonText}>Solicitar</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -241,7 +242,7 @@ export default function PartsScreen() {
       <Stack.Screen
         options={{
           title: 'Peças',
-          headerRight: hasAdminOrPartsRole
+          headerRight: canEdit
             ? () => (
                 <TouchableOpacity onPress={() => handleOpenModal()}>
                   <Plus size={24} color={Colors.primary} />
