@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
+import type { User, Role } from '@/types';
 
 type Area = 'Vendas' | 'Locação' | 'Assistência Técnica' | 'Peças';
 
@@ -54,6 +55,8 @@ const STORAGE_KEYS = {
   MENSAGENS: '@indi:mock:mensagens',
   MAQUINAS: '@indi:mock:maquinas',
   PECAS: '@indi:mock:pecas',
+  COLABORADORES: '@indi:mock:colaboradores',
+  CLIENTES: '@indi:mock:clientes',
 };
 
 const MOCK_MAQUINAS_VENDAS: Maquina[] = [
@@ -196,6 +199,8 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [pecas, setPecas] = useState<Peca[]>([]);
+  const [colaboradores, setColaboradores] = useState<User[]>([]);
+  const [clientes, setClientes] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -237,6 +242,15 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
       } else {
         setPecas(MOCK_PECAS);
         await AsyncStorage.setItem(STORAGE_KEYS.PECAS, JSON.stringify(MOCK_PECAS));
+      }
+
+      const usersDbString = await AsyncStorage.getItem('@indi:usersDb');
+      if (usersDbString) {
+        const allUsers: User[] = JSON.parse(usersDbString);
+        const employeeUsers = allUsers.filter(u => u.type === 'employee');
+        const clientUsers = allUsers.filter(u => u.type === 'client');
+        setColaboradores(employeeUsers);
+        setClientes(clientUsers);
       }
 
       console.log('MockDataContext: Dados carregados com sucesso');
@@ -482,11 +496,100 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     }
   }, [pecas]);
 
+  const listColaboradores = useCallback((): User[] => {
+    return colaboradores;
+  }, [colaboradores]);
+
+  const criarColaborador = useCallback(async (data: {
+    email: string;
+    fullName: string;
+    roles: Role[];
+  }): Promise<User | null> => {
+    console.log('MockDataContext: Criando colaborador:', data);
+    try {
+      const novoColaborador: User = {
+        id: Date.now().toString(),
+        type: 'employee',
+        email: data.email,
+        fullName: data.fullName,
+        roles: data.roles,
+        lgpdConsent: true,
+        lgpdConsentDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const usersDbString = await AsyncStorage.getItem('@indi:usersDb');
+      const allUsers: User[] = usersDbString ? JSON.parse(usersDbString) : [];
+      allUsers.push(novoColaborador);
+      await AsyncStorage.setItem('@indi:usersDb', JSON.stringify(allUsers));
+
+      const updatedColaboradores = [...colaboradores, novoColaborador];
+      setColaboradores(updatedColaboradores);
+      console.log('MockDataContext: Colaborador criado com sucesso');
+      return novoColaborador;
+    } catch (error) {
+      console.error('MockDataContext: Erro ao criar colaborador:', error);
+      return null;
+    }
+  }, [colaboradores]);
+
+  const atualizarColaborador = useCallback(async (id: string, data: Partial<User>): Promise<User | null> => {
+    console.log('MockDataContext: Atualizando colaborador:', { id, data });
+    try {
+      const usersDbString = await AsyncStorage.getItem('@indi:usersDb');
+      const allUsers: User[] = usersDbString ? JSON.parse(usersDbString) : [];
+      const userIndex = allUsers.findIndex(u => u.id === id);
+      
+      if (userIndex === -1) return null;
+
+      allUsers[userIndex] = {
+        ...allUsers[userIndex],
+        ...data,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem('@indi:usersDb', JSON.stringify(allUsers));
+
+      const updatedColaboradores = colaboradores.map(c =>
+        c.id === id ? allUsers[userIndex] : c
+      );
+      setColaboradores(updatedColaboradores);
+      console.log('MockDataContext: Colaborador atualizado com sucesso');
+      return allUsers[userIndex];
+    } catch (error) {
+      console.error('MockDataContext: Erro ao atualizar colaborador:', error);
+      return null;
+    }
+  }, [colaboradores]);
+
+  const removerColaborador = useCallback(async (id: string): Promise<void> => {
+    console.log('MockDataContext: Removendo colaborador:', id);
+    try {
+      const usersDbString = await AsyncStorage.getItem('@indi:usersDb');
+      const allUsers: User[] = usersDbString ? JSON.parse(usersDbString) : [];
+      const filtered = allUsers.filter(u => u.id !== id);
+      await AsyncStorage.setItem('@indi:usersDb', JSON.stringify(filtered));
+
+      const updatedColaboradores = colaboradores.filter(c => c.id !== id);
+      setColaboradores(updatedColaboradores);
+      console.log('MockDataContext: Colaborador removido com sucesso');
+    } catch (error) {
+      console.error('MockDataContext: Erro ao remover colaborador:', error);
+    }
+  }, [colaboradores]);
+
+  const listClientes = useCallback((): User[] => {
+    return clientes;
+  }, [clientes]);
+
   return useMemo(() => ({
     conversas,
     mensagens,
     maquinas,
     pecas,
+    colaboradores,
+    clientes,
     isLoading,
     listConversasPorUsuario,
     listConversasPorArea,
@@ -502,11 +605,18 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     criarPeca,
     atualizarPeca,
     removerPeca,
+    listColaboradores,
+    criarColaborador,
+    atualizarColaborador,
+    removerColaborador,
+    listClientes,
   }), [
     conversas,
     mensagens,
     maquinas,
     pecas,
+    colaboradores,
+    clientes,
     isLoading,
     listConversasPorUsuario,
     listConversasPorArea,
@@ -522,5 +632,10 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     criarPeca,
     atualizarPeca,
     removerPeca,
+    listColaboradores,
+    criarColaborador,
+    atualizarColaborador,
+    removerColaborador,
+    listClientes,
   ]);
 });
