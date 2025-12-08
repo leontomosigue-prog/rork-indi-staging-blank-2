@@ -280,6 +280,7 @@ export default function PartsScreen() {
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Buscar por nome ou SKU"
+            placeholderTextColor={Colors.textDarkLight}
           />
         </View>
 
@@ -360,6 +361,7 @@ export default function PartsScreen() {
               value={formData.sku}
               onChangeText={(text) => setFormData({ ...formData, sku: text })}
               placeholder="Ex: HYD-001"
+              placeholderTextColor={Colors.textDarkLight}
               editable={!editingPart}
             />
 
@@ -369,6 +371,7 @@ export default function PartsScreen() {
               value={formData.nome}
               onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Válvula Hidráulica"
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Categoria</Text>
@@ -400,6 +403,7 @@ export default function PartsScreen() {
               value={formData.preco}
               onChangeText={(text) => setFormData({ ...formData, preco: text })}
               placeholder="Ex: 150.00"
+              placeholderTextColor={Colors.textDarkLight}
               keyboardType="numeric"
             />
 
@@ -409,6 +413,7 @@ export default function PartsScreen() {
               value={formData.estoque}
               onChangeText={(text) => setFormData({ ...formData, estoque: text })}
               placeholder="Ex: 10"
+              placeholderTextColor={Colors.textDarkLight}
               keyboardType="numeric"
             />
 
@@ -421,6 +426,7 @@ export default function PartsScreen() {
                     value={formData.imageUrl}
                     onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
                     placeholder="Ex: https://exemplo.com/imagem.jpg"
+                    placeholderTextColor={Colors.textDarkLight}
                   />
                   {formData.imageUrl && (
                     <TouchableOpacity
@@ -472,10 +478,10 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
   },
   filterContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: Colors.lightBorder,
   },
   searchContainer: {
     flexDirection: 'row' as const,
@@ -490,6 +496,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingLeft: 8,
     fontSize: 16,
+    color: Colors.text,
   },
   categoryScroll: {
     marginHorizontal: -16,
@@ -504,7 +511,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   categoryChipActive: {
     backgroundColor: Colors.primary,
@@ -522,7 +529,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   partCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -535,6 +542,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.lightBorder,
   },
   partImage: {
     width: 70,
@@ -555,12 +564,12 @@ const styles = StyleSheet.create({
   partName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: Colors.textDark,
     marginBottom: 4,
   },
   partSku: {
     fontSize: 13,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
     marginBottom: 4,
   },
   partCategory: {
@@ -576,11 +585,11 @@ const styles = StyleSheet.create({
   partPrice: {
     fontSize: 16,
     fontWeight: '700' as const,
-    color: Colors.text,
+    color: Colors.primary,
   },
   partStock: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
   },
   actions: {
     flexDirection: 'row' as const,
@@ -627,13 +636,13 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderBottomColor: Colors.lightBorder,
+    backgroundColor: Colors.lightSurface,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
-    color: Colors.text,
+    color: Colors.textDark,
   },
   cancelButton: {
     fontSize: 16,
@@ -651,12 +660,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: Colors.textDark,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.lightBorder,
   },
   categoryGrid: {
     flexDirection: 'row' as const,
@@ -667,9 +677,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.lightBorder,
   },
   categoryOptionActive: {
     backgroundColor: Colors.primary,
@@ -677,7 +687,7 @@ const styles = StyleSheet.create({
   },
   categoryOptionText: {
     fontSize: 14,
-    color: Colors.text,
+    color: Colors.textDark,
   },
   categoryOptionTextActive: {
     color: '#fff',

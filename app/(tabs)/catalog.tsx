@@ -499,6 +499,7 @@ export default function CatalogScreen() {
                   value={partFormData.sku}
                   onChangeText={(text) => setPartFormData({ ...partFormData, sku: text })}
                   placeholder="Ex: HYD-001"
+                  placeholderTextColor={Colors.textDarkLight}
                   editable={!editingId}
                 />
 
@@ -508,6 +509,7 @@ export default function CatalogScreen() {
                   value={partFormData.nome}
                   onChangeText={(text) => setPartFormData({ ...partFormData, nome: text })}
                   placeholder="Ex: Válvula Hidráulica"
+                  placeholderTextColor={Colors.textDarkLight}
                 />
 
                 <Text style={styles.label}>Categoria</Text>
@@ -540,6 +542,7 @@ export default function CatalogScreen() {
                   value={partFormData.preco}
                   onChangeText={(text) => setPartFormData({ ...partFormData, preco: text })}
                   placeholder="Ex: 150.00"
+                  placeholderTextColor={Colors.textDarkLight}
                   keyboardType="numeric"
                 />
 
@@ -549,6 +552,7 @@ export default function CatalogScreen() {
                   value={partFormData.estoque}
                   onChangeText={(text) => setPartFormData({ ...partFormData, estoque: text })}
                   placeholder="Ex: 10"
+                  placeholderTextColor={Colors.textDarkLight}
                   keyboardType="numeric"
                 />
               </>
@@ -560,6 +564,7 @@ export default function CatalogScreen() {
                   value={machineFormData.nome}
                   onChangeText={(text) => setMachineFormData({ ...machineFormData, nome: text })}
                   placeholder="Ex: Empilhadeira Elétrica"
+                  placeholderTextColor={Colors.textDarkLight}
                 />
 
                 <Text style={styles.label}>Marca</Text>
@@ -568,6 +573,7 @@ export default function CatalogScreen() {
                   value={machineFormData.marca}
                   onChangeText={(text) => setMachineFormData({ ...machineFormData, marca: text })}
                   placeholder="Ex: Heli"
+                  placeholderTextColor={Colors.textDarkLight}
                 />
 
                 <Text style={styles.label}>Modelo</Text>
@@ -578,6 +584,7 @@ export default function CatalogScreen() {
                     setMachineFormData({ ...machineFormData, modelo: text })
                   }
                   placeholder="Ex: CPD18"
+                  placeholderTextColor={Colors.textDarkLight}
                 />
 
                 {activeTab === 'vendas' ? (
@@ -590,6 +597,7 @@ export default function CatalogScreen() {
                         setMachineFormData({ ...machineFormData, preco: text })
                       }
                       placeholder="Ex: 85000.00"
+                      placeholderTextColor={Colors.textDarkLight}
                       keyboardType="numeric"
                     />
                   </>
@@ -603,6 +611,7 @@ export default function CatalogScreen() {
                         setMachineFormData({ ...machineFormData, diaria: text })
                       }
                       placeholder="Ex: 250.00"
+                      placeholderTextColor={Colors.textDarkLight}
                       keyboardType="numeric"
                     />
 
@@ -614,6 +623,7 @@ export default function CatalogScreen() {
                         setMachineFormData({ ...machineFormData, mensal: text })
                       }
                       placeholder="Ex: 5000.00"
+                      placeholderTextColor={Colors.textDarkLight}
                       keyboardType="numeric"
                     />
                   </>
@@ -631,6 +641,7 @@ export default function CatalogScreen() {
                   : setMachineFormData({ ...machineFormData, imageUrl: text })
               }
               placeholder="Ex: https://exemplo.com/imagem.jpg"
+              placeholderTextColor={Colors.textDarkLight}
             />
             {(activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl) && (
               <Image
@@ -676,9 +687,9 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row' as const,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: Colors.lightBorder,
   },
   tab: {
     flex: 1,
@@ -695,7 +706,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
   },
   activeTabText: {
     color: Colors.primary,
@@ -705,7 +716,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   itemCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -718,6 +729,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.lightBorder,
   },
   itemImage: {
     width: 70,
@@ -738,17 +751,17 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: Colors.textDark,
     marginBottom: 4,
   },
   itemDetails: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
     marginBottom: 8,
   },
   itemSku: {
     fontSize: 13,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
     marginBottom: 4,
   },
   itemCategory: {
@@ -764,7 +777,7 @@ const styles = StyleSheet.create({
   },
   itemStock: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
   },
   priceContainer: {
     gap: 4,
@@ -807,13 +820,13 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderBottomColor: Colors.lightBorder,
+    backgroundColor: Colors.lightSurface,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
-    color: Colors.text,
+    color: Colors.textDark,
   },
   cancelButton: {
     fontSize: 16,
@@ -831,12 +844,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: Colors.textDark,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.lightBorder,
   },
   categoryGrid: {
     flexDirection: 'row' as const,
@@ -847,9 +861,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.lightBorder,
   },
   categoryOptionActive: {
     backgroundColor: Colors.primary,
@@ -857,7 +871,7 @@ const styles = StyleSheet.create({
   },
   categoryOptionText: {
     fontSize: 14,
-    color: Colors.text,
+    color: Colors.textDark,
   },
   categoryOptionTextActive: {
     color: '#fff',

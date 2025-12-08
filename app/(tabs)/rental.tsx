@@ -286,6 +286,7 @@ export default function RentalScreen() {
               value={formData.nome}
               onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Empilhadeira para Locação"
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Marca</Text>
@@ -294,6 +295,7 @@ export default function RentalScreen() {
               value={formData.marca}
               onChangeText={(text) => setFormData({ ...formData, marca: text })}
               placeholder="Ex: Heli"
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Modelo</Text>
@@ -302,6 +304,7 @@ export default function RentalScreen() {
               value={formData.modelo}
               onChangeText={(text) => setFormData({ ...formData, modelo: text })}
               placeholder="Ex: CPD25"
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Diária (R$)</Text>
@@ -310,6 +313,7 @@ export default function RentalScreen() {
               value={formData.diaria}
               onChangeText={(text) => setFormData({ ...formData, diaria: text })}
               placeholder="Ex: 250.00"
+              placeholderTextColor={Colors.textDarkLight}
               keyboardType="numeric"
             />
 
@@ -319,6 +323,7 @@ export default function RentalScreen() {
               value={formData.mensal}
               onChangeText={(text) => setFormData({ ...formData, mensal: text })}
               placeholder="Ex: 5000.00"
+              placeholderTextColor={Colors.textDarkLight}
               keyboardType="numeric"
             />
 
@@ -331,6 +336,7 @@ export default function RentalScreen() {
                     value={formData.imageUrl}
                     onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
                     placeholder="Ex: https://exemplo.com/imagem.jpg"
+                    placeholderTextColor={Colors.textDarkLight}
                   />
                   {formData.imageUrl && (
                     <TouchableOpacity
@@ -385,7 +391,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   offerCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -398,6 +404,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.lightBorder,
   },
   offerImage: {
     width: 80,
@@ -418,12 +426,12 @@ const styles = StyleSheet.create({
   offerName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: Colors.textDark,
     marginBottom: 4,
   },
   offerDetails: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
     marginBottom: 8,
   },
   priceContainer: {
@@ -479,12 +487,13 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: Colors.lightBorder,
+    backgroundColor: Colors.lightSurface,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
-    color: Colors.text,
+    color: Colors.textDark,
   },
   cancelButton: {
     fontSize: 16,
@@ -516,12 +525,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.lightSurface,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: Colors.textDark,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.lightBorder,
   },
   submitButton: {
     backgroundColor: Colors.primary,

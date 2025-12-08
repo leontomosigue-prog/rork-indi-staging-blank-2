@@ -275,7 +275,7 @@ export default function SalesScreen() {
               value={formData.nome}
               onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Empilhadeira Elétrica"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Marca</Text>
@@ -284,7 +284,7 @@ export default function SalesScreen() {
               value={formData.marca}
               onChangeText={(text) => setFormData({ ...formData, marca: text })}
               placeholder="Ex: Heli"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Modelo</Text>
@@ -293,7 +293,7 @@ export default function SalesScreen() {
               value={formData.modelo}
               onChangeText={(text) => setFormData({ ...formData, modelo: text })}
               placeholder="Ex: CPD18"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             <Text style={styles.label}>Preço (R$)</Text>
@@ -303,7 +303,7 @@ export default function SalesScreen() {
               onChangeText={(text) => setFormData({ ...formData, preco: text })}
               placeholder="Ex: 85000.00"
               keyboardType="numeric"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textDarkLight}
             />
 
             {canEdit && (
@@ -315,7 +315,7 @@ export default function SalesScreen() {
                     value={formData.imageUrl}
                     onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
                     placeholder="Ex: https://exemplo.com/imagem.jpg"
-                    placeholderTextColor={Colors.textLight}
+                    placeholderTextColor={Colors.textDarkLight}
                   />
                   {formData.imageUrl && (
                     <TouchableOpacity
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   machineCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.lightSurface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.lightBorder,
   },
   machineImage: {
     width: 80,
@@ -405,12 +405,12 @@ const styles = StyleSheet.create({
   machineName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: Colors.textDark,
     marginBottom: 4,
   },
   machineDetails: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textDarkLight,
     marginBottom: 8,
   },
   machinePrice: {
@@ -463,12 +463,13 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.lightBorder,
+    backgroundColor: Colors.lightSurface,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
-    color: Colors.text,
+    color: Colors.textDark,
   },
   cancelButton: {
     fontSize: 16,
@@ -500,13 +501,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.lightSurface,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: Colors.text,
+    color: Colors.textDark,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.lightBorder,
   },
   submitButton: {
     backgroundColor: Colors.primary,
