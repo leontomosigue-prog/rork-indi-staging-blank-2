@@ -17,6 +17,7 @@ import { Plus, Edit2, Trash2, ShoppingCart, ImageIcon, X } from 'lucide-react-na
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 interface MachineFormData {
   nome: string;
@@ -217,6 +218,7 @@ export default function SalesScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen
         options={{
           title: 'Vendas',

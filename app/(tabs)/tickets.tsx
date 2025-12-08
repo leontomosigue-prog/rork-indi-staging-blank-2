@@ -1,9 +1,11 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 export default function TicketsScreen() {
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Text style={styles.title}>Chamados</Text>
       <Text style={styles.subtitle}>Lista de chamados</Text>
     </View>

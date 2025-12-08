@@ -15,6 +15,7 @@ import { MessageSquare, Plus } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 type Area = 'Vendas' | 'Locação' | 'Assistência Técnica' | 'Peças';
 
@@ -122,6 +123,7 @@ export default function MessagesScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen
         options={{
           title: 'Mensagens',

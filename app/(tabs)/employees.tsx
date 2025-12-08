@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 import type { Role, User as UserType } from '@/types';
+import Logo from '@/components/Logo';
 
 interface EmployeeFormData {
   email: string;
@@ -199,6 +200,7 @@ export default function EmployeesScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen
         options={{
           title: 'Colaboradores',

@@ -6,6 +6,7 @@ import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import { useState } from 'react';
+import Logo from '@/components/Logo';
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
@@ -125,6 +126,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <Logo size={80} />
       <View style={styles.header}>
         <View style={styles.avatarWrapper}>
           <Pressable onPress={pickImage} disabled={isUploadingPhoto}>

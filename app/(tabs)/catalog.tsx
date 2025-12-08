@@ -17,6 +17,7 @@ import { Plus, Edit2, Trash2, Package, Truck, ShoppingBag, ImageIcon } from 'luc
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 type CatalogTab = 'vendas' | 'locacao' | 'pecas';
 
@@ -397,6 +398,7 @@ export default function CatalogScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen
         options={{
           title: 'Catálogo',

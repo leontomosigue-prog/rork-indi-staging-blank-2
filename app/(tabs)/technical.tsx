@@ -15,6 +15,7 @@ import { Wrench } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 type Priority = 'Preventiva' | 'Urgente' | 'Para Ontem';
 
@@ -124,6 +125,7 @@ export default function TechnicalScreen() {
 
     return (
       <View style={styles.container}>
+        <Logo size={80} />
         <Stack.Screen options={{ title: 'Assistência Técnica' }} />
 
         <FlatList
@@ -144,6 +146,7 @@ export default function TechnicalScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen options={{ title: 'Assistência Técnica' }} />
 
       <View style={styles.formContainer}>

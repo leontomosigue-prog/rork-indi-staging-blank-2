@@ -18,6 +18,7 @@ import {
 
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
+import Logo from '@/components/Logo';
 
 export default function LoginScreen() {
   const { login, loginWithBiometric, biometricAvailable, user } = useAuth();
@@ -97,6 +98,7 @@ export default function LoginScreen() {
         style={[styles.keyboardView, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Logo size={120} />
           <View style={styles.logoContainer}>
             <Image
               source={{ uri: 'https://via.placeholder.com/150x150.png?text=INDI' }}

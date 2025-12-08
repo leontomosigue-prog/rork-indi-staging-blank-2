@@ -17,6 +17,7 @@ import { Plus, Edit2, Trash2, Calendar, ImageIcon, X } from 'lucide-react-native
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 interface RentalFormData {
   nome: string;
@@ -228,6 +229,7 @@ export default function RentalScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen
         options={{
           title: 'Locação',

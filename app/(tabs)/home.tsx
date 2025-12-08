@@ -4,6 +4,7 @@ import { MessageSquare } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -72,6 +73,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <View style={styles.header}>
         <Text style={styles.title}>Olá, {user.fullName}!</Text>
         <Text style={styles.subtitle}>

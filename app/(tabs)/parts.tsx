@@ -17,6 +17,7 @@ import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X } from 'lucide-react
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
+import Logo from '@/components/Logo';
 
 interface PartFormData {
   sku: string;
@@ -257,6 +258,7 @@ export default function PartsScreen() {
 
   return (
     <View style={styles.container}>
+      <Logo size={80} />
       <Stack.Screen
         options={{
           title: 'Peças',
