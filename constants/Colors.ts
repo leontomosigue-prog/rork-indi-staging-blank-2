@@ -2,6 +2,7 @@ const Colors = {
   primary: '#DC2626',
   secondary: '#991B1B',
   background: '#2B2B2B',
+  headerBackground: '#1E1E1E',
   surface: '#4B5563',
   text: '#FFFFFF',
   textLight: 'rgba(255, 255, 255, 0.7)',

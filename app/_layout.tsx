@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { MockDataProvider } from "@/contexts/MockDataContext";
 import { trpc, trpcClient } from "@/lib/trpc";
+import Colors from "@/constants/Colors";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,7 +25,16 @@ export default function RootLayout() {
                     <AuthProvider>
                         <DataProvider>
                             <MockDataProvider>
-                                <Stack screenOptions={{ headerBackTitle: "Voltar" }}>
+                                <Stack screenOptions={{ 
+                                    headerBackTitle: "Voltar",
+                                    headerStyle: {
+                                        backgroundColor: Colors.headerBackground,
+                                    },
+                                    headerTintColor: Colors.text,
+                                    headerTitleStyle: {
+                                        color: Colors.text,
+                                    },
+                                }}>
                                     <Stack.Screen name="index" options={{ headerShown: false }} />
                                     <Stack.Screen name="login" options={{ headerShown: false }} />
                                     <Stack.Screen name="register" options={{ headerShown: false }} />

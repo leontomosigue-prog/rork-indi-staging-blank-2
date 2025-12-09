@@ -25,11 +25,11 @@ export default function TabLayout() {
           tabBarActiveTintColor: Colors.primary,
           tabBarInactiveTintColor: Colors.textLight,
           tabBarStyle: {
-            backgroundColor: Colors.surface,
+            backgroundColor: Colors.headerBackground,
             borderTopColor: Colors.border,
           },
           headerStyle: {
-            backgroundColor: Colors.surface,
+            backgroundColor: Colors.headerBackground,
           },
           headerTintColor: Colors.text,
           headerShown: true,
@@ -123,11 +123,11 @@ export default function TabLayout() {
           tabBarActiveTintColor: Colors.primary,
           tabBarInactiveTintColor: Colors.textLight,
           tabBarStyle: {
-            backgroundColor: Colors.surface,
+            backgroundColor: Colors.headerBackground,
             borderTopColor: Colors.border,
           },
           headerStyle: {
-            backgroundColor: Colors.surface,
+            backgroundColor: Colors.headerBackground,
           },
           headerTintColor: Colors.text,
           headerShown: true,
@@ -246,11 +246,11 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textLight,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
+          backgroundColor: Colors.headerBackground,
           borderTopColor: Colors.border,
         },
         headerStyle: {
-          backgroundColor: Colors.surface,
+          backgroundColor: Colors.headerBackground,
         },
         headerTintColor: Colors.text,
         headerShown: true,
