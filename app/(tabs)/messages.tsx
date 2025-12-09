@@ -142,7 +142,7 @@ export default function MessagesScreen() {
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MessageSquare size={64} color={Colors.textLight} />
+            <MessageSquare size={64} color={Colors.textSecondary} />
             <Text style={styles.emptyText}>Nenhuma conversa ativa</Text>
             <Text style={styles.emptySubtext}>
               Suas conversas aparecerão aqui quando você solicitar orçamentos ou abrir chamados
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   conversationCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -272,14 +272,14 @@ const styles = StyleSheet.create({
   },
   conversationSubtitle: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   conversationMeta: {
     alignItems: 'flex-end' as const,
   },
   conversationDate: {
     fontSize: 12,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   statusBadge: {
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     textAlign: 'center' as const,
     lineHeight: 20,
   },
@@ -324,8 +324,8 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.cardBackground,
   },
   modalTitle: {
     fontSize: 20,
@@ -357,9 +357,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cardBackground,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     alignItems: 'center' as const,
   },
   areaOptionActive: {
@@ -375,12 +375,13 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   textArea: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cardBackground,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: Colors.text,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     minHeight: 120,
   },
   submitButton: {

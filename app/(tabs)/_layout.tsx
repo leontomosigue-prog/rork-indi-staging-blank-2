@@ -23,7 +23,7 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors.primary,
-          tabBarInactiveTintColor: Colors.textLight,
+          tabBarInactiveTintColor: Colors.textSecondary,
           tabBarStyle: {
             backgroundColor: Colors.headerBackground,
             borderTopColor: Colors.border,
@@ -121,7 +121,7 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors.primary,
-          tabBarInactiveTintColor: Colors.textLight,
+          tabBarInactiveTintColor: Colors.textSecondary,
           tabBarStyle: {
             backgroundColor: Colors.headerBackground,
             borderTopColor: Colors.border,
@@ -244,7 +244,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textLight,
+        tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
           backgroundColor: Colors.headerBackground,
           borderTopColor: Colors.border,

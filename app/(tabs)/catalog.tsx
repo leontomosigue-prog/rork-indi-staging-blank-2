@@ -278,7 +278,7 @@ export default function CatalogScreen() {
         />
       ) : (
         <View style={styles.itemImagePlaceholder}>
-          <ImageIcon size={28} color={Colors.textLight} />
+          <ImageIcon size={28} color={Colors.textSecondary} />
         </View>
       )}
       <View style={styles.itemInfo}>
@@ -335,7 +335,7 @@ export default function CatalogScreen() {
         />
       ) : (
         <View style={styles.itemImagePlaceholder}>
-          <ImageIcon size={28} color={Colors.textLight} />
+          <ImageIcon size={28} color={Colors.textSecondary} />
         </View>
       )}
       <View style={styles.itemInfo}>
@@ -415,7 +415,7 @@ export default function CatalogScreen() {
           style={[styles.tab, activeTab === 'vendas' && styles.activeTab]}
           onPress={() => setActiveTab('vendas')}
         >
-          <ShoppingBag size={20} color={activeTab === 'vendas' ? Colors.primary : Colors.textLight} />
+          <ShoppingBag size={20} color={activeTab === 'vendas' ? Colors.primary : Colors.textSecondary} />
           <Text style={[styles.tabText, activeTab === 'vendas' && styles.activeTabText]}>
             Vendas
           </Text>
@@ -424,7 +424,7 @@ export default function CatalogScreen() {
           style={[styles.tab, activeTab === 'locacao' && styles.activeTab]}
           onPress={() => setActiveTab('locacao')}
         >
-          <Truck size={20} color={activeTab === 'locacao' ? Colors.primary : Colors.textLight} />
+          <Truck size={20} color={activeTab === 'locacao' ? Colors.primary : Colors.textSecondary} />
           <Text style={[styles.tabText, activeTab === 'locacao' && styles.activeTabText]}>
             Locação
           </Text>
@@ -433,7 +433,7 @@ export default function CatalogScreen() {
           style={[styles.tab, activeTab === 'pecas' && styles.activeTab]}
           onPress={() => setActiveTab('pecas')}
         >
-          <Package size={20} color={activeTab === 'pecas' ? Colors.primary : Colors.textLight} />
+          <Package size={20} color={activeTab === 'pecas' ? Colors.primary : Colors.textSecondary} />
           <Text style={[styles.tabText, activeTab === 'pecas' && styles.activeTabText]}>
             Peças
           </Text>
@@ -499,7 +499,7 @@ export default function CatalogScreen() {
                   value={partFormData.sku}
                   onChangeText={(text) => setPartFormData({ ...partFormData, sku: text })}
                   placeholder="Ex: HYD-001"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                   editable={!editingId}
                 />
 
@@ -509,7 +509,7 @@ export default function CatalogScreen() {
                   value={partFormData.nome}
                   onChangeText={(text) => setPartFormData({ ...partFormData, nome: text })}
                   placeholder="Ex: Válvula Hidráulica"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                 />
 
                 <Text style={styles.label}>Categoria</Text>
@@ -542,7 +542,7 @@ export default function CatalogScreen() {
                   value={partFormData.preco}
                   onChangeText={(text) => setPartFormData({ ...partFormData, preco: text })}
                   placeholder="Ex: 150.00"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                   keyboardType="numeric"
                 />
 
@@ -552,7 +552,7 @@ export default function CatalogScreen() {
                   value={partFormData.estoque}
                   onChangeText={(text) => setPartFormData({ ...partFormData, estoque: text })}
                   placeholder="Ex: 10"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                   keyboardType="numeric"
                 />
               </>
@@ -564,7 +564,7 @@ export default function CatalogScreen() {
                   value={machineFormData.nome}
                   onChangeText={(text) => setMachineFormData({ ...machineFormData, nome: text })}
                   placeholder="Ex: Empilhadeira Elétrica"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                 />
 
                 <Text style={styles.label}>Marca</Text>
@@ -573,7 +573,7 @@ export default function CatalogScreen() {
                   value={machineFormData.marca}
                   onChangeText={(text) => setMachineFormData({ ...machineFormData, marca: text })}
                   placeholder="Ex: Heli"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                 />
 
                 <Text style={styles.label}>Modelo</Text>
@@ -584,7 +584,7 @@ export default function CatalogScreen() {
                     setMachineFormData({ ...machineFormData, modelo: text })
                   }
                   placeholder="Ex: CPD18"
-                  placeholderTextColor={Colors.textDarkLight}
+                  placeholderTextColor={Colors.textSecondary}
                 />
 
                 {activeTab === 'vendas' ? (
@@ -597,7 +597,7 @@ export default function CatalogScreen() {
                         setMachineFormData({ ...machineFormData, preco: text })
                       }
                       placeholder="Ex: 85000.00"
-                      placeholderTextColor={Colors.textDarkLight}
+                      placeholderTextColor={Colors.textSecondary}
                       keyboardType="numeric"
                     />
                   </>
@@ -611,7 +611,7 @@ export default function CatalogScreen() {
                         setMachineFormData({ ...machineFormData, diaria: text })
                       }
                       placeholder="Ex: 250.00"
-                      placeholderTextColor={Colors.textDarkLight}
+                      placeholderTextColor={Colors.textSecondary}
                       keyboardType="numeric"
                     />
 
@@ -623,7 +623,7 @@ export default function CatalogScreen() {
                         setMachineFormData({ ...machineFormData, mensal: text })
                       }
                       placeholder="Ex: 5000.00"
-                      placeholderTextColor={Colors.textDarkLight}
+                      placeholderTextColor={Colors.textSecondary}
                       keyboardType="numeric"
                     />
                   </>
@@ -641,7 +641,7 @@ export default function CatalogScreen() {
                   : setMachineFormData({ ...machineFormData, imageUrl: text })
               }
               placeholder="Ex: https://exemplo.com/imagem.jpg"
-              placeholderTextColor={Colors.textDarkLight}
+              placeholderTextColor={Colors.textSecondary}
             />
             {(activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl) && (
               <Image
@@ -683,13 +683,13 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   tabsContainer: {
     flexDirection: 'row' as const,
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.lightBorder,
+    borderBottomColor: Colors.border,
   },
   tab: {
     flex: 1,
@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    color: Colors.textDarkLight,
+    color: Colors.textSecondary,
   },
   activeTabText: {
     color: Colors.primary,
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   itemCard: {
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -730,7 +730,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 12,
     borderWidth: 1,
-    borderColor: Colors.lightBorder,
+    borderColor: Colors.border,
   },
   itemImage: {
     width: 70,
@@ -751,17 +751,17 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.textDark,
+    color: Colors.text,
     marginBottom: 4,
   },
   itemDetails: {
     fontSize: 14,
-    color: Colors.textDarkLight,
+    color: Colors.textSecondary,
     marginBottom: 8,
   },
   itemSku: {
     fontSize: 13,
-    color: Colors.textDarkLight,
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   itemCategory: {
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
   },
   itemStock: {
     fontSize: 14,
-    color: Colors.textDarkLight,
+    color: Colors.textSecondary,
   },
   priceContainer: {
     gap: 4,
@@ -808,7 +808,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   modalContainer: {
     flex: 1,
@@ -820,13 +820,13 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.lightBorder,
-    backgroundColor: Colors.lightSurface,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.cardBackground,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
-    color: Colors.textDark,
+    color: Colors.text,
   },
   cancelButton: {
     fontSize: 16,
@@ -844,13 +844,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: Colors.textDark,
+    color: Colors.text,
     borderWidth: 1,
-    borderColor: Colors.lightBorder,
+    borderColor: Colors.border,
   },
   categoryGrid: {
     flexDirection: 'row' as const,
@@ -861,9 +861,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderWidth: 1,
-    borderColor: Colors.lightBorder,
+    borderColor: Colors.border,
   },
   categoryOptionActive: {
     backgroundColor: Colors.primary,
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
   },
   categoryOptionText: {
     fontSize: 14,
-    color: Colors.textDark,
+    color: Colors.text,
   },
   categoryOptionTextActive: {
     color: '#fff',

@@ -203,7 +203,7 @@ export default function PartsScreen() {
         />
       ) : (
         <View style={styles.partImagePlaceholder}>
-          <ImageIcon size={28} color={Colors.textLight} />
+          <ImageIcon size={28} color={Colors.textSecondary} />
         </View>
       )}
       <View style={styles.partInfo}>
@@ -274,13 +274,13 @@ export default function PartsScreen() {
 
       <View style={styles.filterContainer}>
         <View style={styles.searchContainer}>
-          <Search size={20} color={Colors.textLight} />
+          <Search size={20} color={Colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Buscar por nome ou SKU"
-            placeholderTextColor={Colors.textDarkLight}
+            placeholderTextColor={Colors.textSecondary}
           />
         </View>
 
@@ -361,7 +361,7 @@ export default function PartsScreen() {
               value={formData.sku}
               onChangeText={(text) => setFormData({ ...formData, sku: text })}
               placeholder="Ex: HYD-001"
-              placeholderTextColor={Colors.textDarkLight}
+              placeholderTextColor={Colors.textSecondary}
               editable={!editingPart}
             />
 
@@ -371,7 +371,7 @@ export default function PartsScreen() {
               value={formData.nome}
               onChangeText={(text) => setFormData({ ...formData, nome: text })}
               placeholder="Ex: Válvula Hidráulica"
-              placeholderTextColor={Colors.textDarkLight}
+              placeholderTextColor={Colors.textSecondary}
             />
 
             <Text style={styles.label}>Categoria</Text>
@@ -403,7 +403,7 @@ export default function PartsScreen() {
               value={formData.preco}
               onChangeText={(text) => setFormData({ ...formData, preco: text })}
               placeholder="Ex: 150.00"
-              placeholderTextColor={Colors.textDarkLight}
+              placeholderTextColor={Colors.textSecondary}
               keyboardType="numeric"
             />
 
@@ -413,7 +413,7 @@ export default function PartsScreen() {
               value={formData.estoque}
               onChangeText={(text) => setFormData({ ...formData, estoque: text })}
               placeholder="Ex: 10"
-              placeholderTextColor={Colors.textDarkLight}
+              placeholderTextColor={Colors.textSecondary}
               keyboardType="numeric"
             />
 
@@ -426,14 +426,14 @@ export default function PartsScreen() {
                     value={formData.imageUrl}
                     onChangeText={(text) => setFormData({ ...formData, imageUrl: text })}
                     placeholder="Ex: https://exemplo.com/imagem.jpg"
-                    placeholderTextColor={Colors.textDarkLight}
+                    placeholderTextColor={Colors.textSecondary}
                   />
                   {formData.imageUrl && (
                     <TouchableOpacity
                       style={styles.clearImageButton}
                       onPress={() => setFormData({ ...formData, imageUrl: '' })}
                     >
-                      <X size={20} color={Colors.textLight} />
+                      <X size={20} color={Colors.textSecondary} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -478,10 +478,10 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
   },
   filterContainer: {
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.lightBorder,
+    borderBottomColor: Colors.border,
   },
   searchContainer: {
     flexDirection: 'row' as const,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   partCard: {
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 12,
     borderWidth: 1,
-    borderColor: Colors.lightBorder,
+    borderColor: Colors.border,
   },
   partImage: {
     width: 70,
@@ -564,12 +564,12 @@ const styles = StyleSheet.create({
   partName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.textDark,
+    color: Colors.text,
     marginBottom: 4,
   },
   partSku: {
     fontSize: 13,
-    color: Colors.textDarkLight,
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   partCategory: {
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   },
   partStock: {
     fontSize: 14,
-    color: Colors.textDarkLight,
+    color: Colors.textSecondary,
   },
   actions: {
     flexDirection: 'row' as const,
@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   modalContainer: {
     flex: 1,
@@ -636,13 +636,13 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.lightBorder,
-    backgroundColor: Colors.lightSurface,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.cardBackground,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
-    color: Colors.textDark,
+    color: Colors.text,
   },
   cancelButton: {
     fontSize: 16,
@@ -660,13 +660,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: Colors.textDark,
+    color: Colors.text,
     borderWidth: 1,
-    borderColor: Colors.lightBorder,
+    borderColor: Colors.border,
   },
   categoryGrid: {
     flexDirection: 'row' as const,
@@ -677,9 +677,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: Colors.lightSurface,
+    backgroundColor: Colors.cardBackground,
     borderWidth: 1,
-    borderColor: Colors.lightBorder,
+    borderColor: Colors.border,
   },
   categoryOptionActive: {
     backgroundColor: Colors.primary,
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   },
   categoryOptionText: {
     fontSize: 14,
-    color: Colors.textDark,
+    color: Colors.text,
   },
   categoryOptionTextActive: {
     color: '#fff',

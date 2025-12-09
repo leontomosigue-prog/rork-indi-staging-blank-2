@@ -322,13 +322,13 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   listContainer: {
     padding: 16,
   },
   employeeCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   },
   employeeEmail: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     marginBottom: 8,
   },
   rolesContainer: {
@@ -375,16 +375,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   roleChip: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    borderWidth: 1,
-    borderColor: Colors.primary,
   },
   roleText: {
     fontSize: 11,
-    color: Colors.primary,
+    color: '#FFFFFF',
     fontWeight: '500' as const,
   },
   actions: {
@@ -409,7 +407,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   modalContainer: {
     flex: 1,
@@ -421,8 +419,8 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.cardBackground,
   },
   modalTitle: {
     fontSize: 20,
@@ -446,16 +444,17 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 12,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cardBackground,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: Colors.text,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   rolesGrid: {
     flexDirection: 'row' as const,
@@ -466,9 +465,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cardBackground,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   roleOptionActive: {
     backgroundColor: Colors.primary,

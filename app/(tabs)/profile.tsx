@@ -141,12 +141,12 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={styles.cameraIconContainer}>
-              <Camera size={18} color={Colors.surface} />
+              <Camera size={18} color={'#FFFFFF'} />
             </View>
           </Pressable>
           {user?.profileImageUrl && (
             <Pressable style={styles.removePhotoButton} onPress={removeProfileImage}>
-              <X size={16} color={Colors.surface} />
+              <X size={16} color={'#FFFFFF'} />
             </Pressable>
           )}
         </View>
@@ -225,7 +225,7 @@ export default function ProfileScreen() {
               value={biometriaAtiva}
               onValueChange={toggleBiometria}
               trackColor={{ false: Colors.border, true: Colors.primary }}
-              thumbColor={Colors.surface}
+              thumbColor={'#FFFFFF'}
             />
           </View>
           <View style={styles.settingRow}>
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   header: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.cardBackground,
     paddingTop: 24,
     paddingBottom: 32,
     paddingHorizontal: 24,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 32,
     fontWeight: '700' as const,
-    color: Colors.surface,
+    color: '#FFFFFF',
   },
   cameraIconContainer: {
     position: 'absolute',
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: Colors.surface,
+    borderColor: Colors.cardBackground,
   },
   removePhotoButton: {
     position: 'absolute',
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: Colors.cardBackground,
   },
   changePhotoText: {
     fontSize: 14,
@@ -401,12 +401,12 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 14,
     fontWeight: '500' as const,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   adminBadge: {
     fontSize: 12,
     fontWeight: '600' as const,
-    color: Colors.surface,
+    color: '#FFFFFF',
     backgroundColor: Colors.secondary,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   infoCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 13,
     fontWeight: '500' as const,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   infoValue: {
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   roleChipText: {
     fontSize: 13,
     fontWeight: '600' as const,
-    color: Colors.surface,
+    color: '#FFFFFF',
   },
   settingRow: {
     flexDirection: 'row',
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   settingAction: {
     fontSize: 24,
     fontWeight: '300' as const,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   settingValue: {
     fontSize: 14,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     color: Colors.success,
   },
   statsCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 24,
     flexDirection: 'row',
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 13,
     fontWeight: '500' as const,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     marginTop: 4,
   },
   statDivider: {
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   areaStatLabel: {
     fontSize: 13,
     fontWeight: '400' as const,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   logoutButton: {
     backgroundColor: Colors.error,
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   logoutText: {
-    color: Colors.surface,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600' as const,
   },
@@ -594,6 +594,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     fontWeight: '400' as const,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
 });

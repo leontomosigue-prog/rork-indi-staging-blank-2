@@ -90,7 +90,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MessageSquare size={64} color={Colors.textLight} />
+            <MessageSquare size={64} color={Colors.textSecondary} />
             <Text style={styles.emptyText}>
               {user.type === 'client'
                 ? 'Você não tem atendimentos em aberto'
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 24,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.cardBackground,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -132,13 +132,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   listContainer: {
     padding: 16,
   },
   conversaCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -172,18 +172,18 @@ const styles = StyleSheet.create({
   },
   conversaSubtitle: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
   },
   conversaMeta: {
     alignItems: 'flex-end' as const,
   },
   conversaDate: {
     fontSize: 12,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   priorityBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   priorityText: {
     fontSize: 10,
     fontWeight: '600' as const,
-    color: Colors.warning,
+    color: '#FFFFFF',
   },
   emptyContainer: {
     flex: 1,
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     textAlign: 'center' as const,
     lineHeight: 20,
   },
