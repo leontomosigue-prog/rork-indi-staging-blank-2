@@ -96,6 +96,7 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.logoContainer}>
             <Logo size={200} noPadding />
+            <Text style={styles.appName}>IndiApp</Text>
           </View>
 
           <View style={styles.form}>
@@ -180,6 +181,13 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: 60,
+  },
+  appName: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    marginTop: 12,
+    textAlign: 'center' as const,
   },
   form: {
     width: '100%',
