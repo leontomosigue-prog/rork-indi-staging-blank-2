@@ -95,7 +95,7 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.logoContainer}>
-            <Logo size={200} noPadding />
+            <Logo size={240} noPadding />
             <Text style={styles.appName}>IndiApp</Text>
           </View>
 
