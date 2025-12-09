@@ -1,11 +1,9 @@
 import { router } from 'expo-router';
 import { Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,13 +14,11 @@ import {
   View,
 } from 'react-native';
 
-import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
 
 export default function LoginScreen() {
   const { login, loginWithBiometric, biometricAvailable, user } = useAuth();
-  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -95,25 +91,20 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.keyboardView, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+        style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Logo size={120} />
           <View style={styles.logoContainer}>
-            <Image
-              source={{ uri: 'https://via.placeholder.com/150x150.png?text=INDI' }}
-              style={styles.logo}
-            />
-            <Text style={styles.welcomeText}>Bem-vindo ao INDI</Text>
-            <Text style={styles.subtitle}>Faça login para continuar</Text>
+            <Logo size={200} noPadding />
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Mail size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <Mail size={20} color="#FFFFFF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="E-mail"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -123,10 +114,11 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Lock size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <Lock size={20} color="#FFFFFF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Senha"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -147,7 +139,7 @@ export default function LoginScreen() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={Colors.surface} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.loginButtonText}>Entrar</Text>
               )}
@@ -155,7 +147,7 @@ export default function LoginScreen() {
 
             {biometricAvailable && (
               <Pressable style={styles.biometricButton} onPress={handleBiometricLogin}>
-                <Fingerprint size={24} color={Colors.primary} />
+                <Fingerprint size={24} color="#FF0000" />
                 <Text style={styles.biometricText}>Entrar com biometria</Text>
               </Pressable>
             )}
@@ -176,50 +168,31 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   keyboardView: {
     flex: 1,
+    backgroundColor: '#2B2B2B',
   },
   scrollContent: {
     flexGrow: 1,
     padding: 24,
+    justifyContent: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 40,
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 24,
-    borderRadius: 60,
-  },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: '700' as const,
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textLight,
+    marginBottom: 60,
   },
   form: {
-    flex: 1,
+    width: '100%',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: '#1E1E1E',
     borderRadius: 12,
     marginBottom: 16,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#3A3A3A',
   },
   inputIcon: {
     marginRight: 12,
@@ -228,16 +201,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     fontSize: 16,
-    color: Colors.text,
+    color: '#FFFFFF',
   },
   forgotPassword: {
-    color: Colors.primary,
+    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'right' as const,
     marginBottom: 24,
     fontSize: 14,
   },
   loginButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FF0000',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -247,7 +220,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   loginButtonText: {
-    color: Colors.surface,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600' as const,
   },
@@ -259,26 +232,26 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   biometricText: {
-    color: Colors.primary,
+    color: '#FF0000',
     fontSize: 16,
     fontWeight: '600' as const,
     marginLeft: 8,
   },
   registerLink: {
-    marginTop: 'auto' as const,
     paddingVertical: 16,
     alignItems: 'center',
+    marginTop: 24,
   },
   registerText: {
-    color: Colors.textLight,
+    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
   },
   registerTextBold: {
-    color: Colors.primary,
+    color: '#FF0000',
     fontWeight: '600' as const,
   },
   errorText: {
-    color: '#ef4444',
+    color: '#FF0000',
     fontSize: 14,
     marginBottom: 12,
     textAlign: 'center' as const,
@@ -289,7 +262,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   debugText: {
-    color: Colors.textLight,
+    color: 'rgba(255, 255, 255, 0.4)',
     fontSize: 12,
     textDecorationLine: 'underline' as const,
   },
