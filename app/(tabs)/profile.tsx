@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Image, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Image, Alert, Platform, Modal, TextInput } from 'react-native';
 import { router } from 'expo-router';
-import { User, Settings, Building2, Shield, TrendingUp, MessageSquare, CheckCircle2, Camera, X } from 'lucide-react-native';
+import { User, Settings, Building2, Shield, TrendingUp, MessageSquare, CheckCircle2, Camera, X, Edit2 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +13,16 @@ export default function ProfileScreen() {
   const { conversas } = useMockData();
   const [biometriaAtiva, setBiometriaAtiva] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingData, setEditingData] = useState({
+    fullName: user?.fullName || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    birthDate: user?.birthDate || '',
+    cpf: user?.cpf || '',
+    companyName: user?.companyName || '',
+    cnpj: user?.cnpj || '',
+  });
 
   const handleLogout = async () => {
     await logout();
@@ -27,6 +37,60 @@ export default function ProfileScreen() {
 
   const handleChangePassword = () => {
     console.log('Navegando para tela de troca de senha');
+  };
+
+  const openEditModal = () => {
+    setEditingData({
+      fullName: user?.fullName || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      birthDate: user?.birthDate || '',
+      cpf: user?.cpf || '',
+      companyName: user?.companyName || '',
+      cnpj: user?.cnpj || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+  };
+
+  const saveProfileChanges = async () => {
+    console.log('ProfileScreen: Salvando alterações dos dados pessoais');
+    
+    if (!editingData.fullName.trim()) {
+      Alert.alert('Erro', 'O nome completo é obrigatório.');
+      return;
+    }
+    
+    if (!editingData.email.trim()) {
+      Alert.alert('Erro', 'O e-mail é obrigatório.');
+      return;
+    }
+    
+    const updates: Partial<typeof user> = {
+      fullName: editingData.fullName.trim(),
+      email: editingData.email.trim(),
+      phone: editingData.phone.trim() || undefined,
+      birthDate: editingData.birthDate.trim() || undefined,
+      cpf: editingData.cpf.trim() || undefined,
+    };
+    
+    if (isClient) {
+      updates.companyName = editingData.companyName.trim() || undefined;
+      updates.cnpj = editingData.cnpj.trim() || undefined;
+    }
+    
+    const success = await updateUser(updates);
+    
+    if (success) {
+      console.log('ProfileScreen: Dados pessoais atualizados com sucesso');
+      setShowEditModal(false);
+      Alert.alert('Sucesso', 'Seus dados foram atualizados com sucesso.');
+    } else {
+      Alert.alert('Erro', 'Não foi possível atualizar seus dados.');
+    }
   };
 
   const pickImage = async () => {
@@ -168,6 +232,10 @@ export default function ProfileScreen() {
         <View style={styles.sectionHeader}>
           <User size={20} color={Colors.primary} />
           <Text style={styles.sectionTitle}>Dados Pessoais</Text>
+          <Pressable style={styles.editButton} onPress={openEditModal}>
+            <Edit2 size={18} color={'#FFFFFF'} />
+            <Text style={styles.editButtonText}>Editar</Text>
+          </Pressable>
         </View>
         <View style={styles.infoCard}>
           <InfoRow label="Nome completo" value={user?.fullName || ''} />
@@ -303,6 +371,121 @@ export default function ProfileScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>INDI • Versão 1.0.0</Text>
       </View>
+
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeEditModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar Dados Pessoais</Text>
+              <Pressable onPress={closeEditModal}>
+                <X size={24} color={Colors.text} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Nome completo *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingData.fullName}
+                  onChangeText={(text) => setEditingData({ ...editingData, fullName: text })}
+                  placeholder="Digite seu nome completo"
+                  placeholderTextColor={Colors.textSecondary}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>E-mail *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingData.email}
+                  onChangeText={(text) => setEditingData({ ...editingData, email: text })}
+                  placeholder="Digite seu e-mail"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Telefone</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingData.phone}
+                  onChangeText={(text) => setEditingData({ ...editingData, phone: text })}
+                  placeholder="Digite seu telefone"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Data de nascimento</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingData.birthDate}
+                  onChangeText={(text) => setEditingData({ ...editingData, birthDate: text })}
+                  placeholder="AAAA-MM-DD"
+                  placeholderTextColor={Colors.textSecondary}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>CPF</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingData.cpf}
+                  onChangeText={(text) => setEditingData({ ...editingData, cpf: text })}
+                  placeholder="Digite seu CPF"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="number-pad"
+                />
+              </View>
+
+              {isClient && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Razão social</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={editingData.companyName}
+                      onChangeText={(text) => setEditingData({ ...editingData, companyName: text })}
+                      placeholder="Digite a razão social"
+                      placeholderTextColor={Colors.textSecondary}
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>CNPJ</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={editingData.cnpj}
+                      onChangeText={(text) => setEditingData({ ...editingData, cnpj: text })}
+                      placeholder="Digite o CNPJ"
+                      placeholderTextColor={Colors.textSecondary}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelButton} onPress={closeEditModal}>
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={saveProfileChanges}>
+                <Text style={styles.saveButtonText}>Salvar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -421,6 +604,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 'auto',
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
   sectionTitle: {
     fontSize: 18,
@@ -595,5 +793,87 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400' as const,
     color: Colors.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.cardBackground,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+    paddingBottom: 32,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  modalScroll: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.text,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
 });
