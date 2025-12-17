@@ -532,6 +532,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     email: string;
     fullName: string;
     roles: Role[];
+    password: string;
   }): Promise<User | null> => {
     console.log('MockDataContext: Criando colaborador:', data);
     try {

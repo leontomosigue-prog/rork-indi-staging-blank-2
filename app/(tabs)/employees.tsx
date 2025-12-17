@@ -23,6 +23,7 @@ interface EmployeeFormData {
   email: string;
   fullName: string;
   roles: Role[];
+  password: string;
 }
 
 const AVAILABLE_ROLES: { value: Role; label: string }[] = [
@@ -43,6 +44,7 @@ export default function EmployeesScreen() {
     email: '',
     fullName: '',
     roles: [],
+    password: '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -50,7 +52,7 @@ export default function EmployeesScreen() {
   const colaboradores = listColaboradores().filter(c => !c.roles?.includes('Admin'));
 
   const resetForm = () => {
-    setFormData({ email: '', fullName: '', roles: [] });
+    setFormData({ email: '', fullName: '', roles: [], password: '' });
     setEditingId(null);
   };
 
@@ -61,6 +63,7 @@ export default function EmployeesScreen() {
         email: employee.email,
         fullName: employee.fullName,
         roles: employee.roles || [],
+        password: '',
       });
     } else {
       resetForm();
@@ -99,6 +102,16 @@ export default function EmployeesScreen() {
       return;
     }
 
+    if (!editingId && !formData.password) {
+      Alert.alert('Erro', 'A senha é obrigatória para novos colaboradores');
+      return;
+    }
+
+    if (!editingId && formData.password.length < 6) {
+      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (editingId) {
@@ -118,6 +131,7 @@ export default function EmployeesScreen() {
           email: formData.email,
           fullName: formData.fullName,
           roles: formData.roles,
+          password: formData.password,
         });
       }
       setIsModalVisible(false);
@@ -267,6 +281,20 @@ export default function EmployeesScreen() {
               onChangeText={(text) => setFormData({ ...formData, fullName: text })}
               placeholder="Nome do colaborador"
             />
+
+            {!editingId && (
+              <>
+                <Text style={styles.label}>Senha</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.password}
+                  onChangeText={(text) => setFormData({ ...formData, password: text })}
+                  placeholder="Senha do colaborador"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </>
+            )}
 
             <Text style={styles.label}>Setores</Text>
             <Text style={styles.helperText}>Selecione os setores que o colaborador terá acesso</Text>
