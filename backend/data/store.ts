@@ -1,15 +1,12 @@
-import { readFile, writeFile } from 'fs/promises';
-import path from 'path';
-
 const DB_ENDPOINT = process.env.EXPO_PUBLIC_RORK_DB_ENDPOINT;
 const DB_NAMESPACE = process.env.EXPO_PUBLIC_RORK_DB_NAMESPACE;
 const DB_TOKEN = process.env.EXPO_PUBLIC_RORK_DB_TOKEN;
 const HAS_DB_CONFIG = Boolean(DB_ENDPOINT && DB_NAMESPACE && DB_TOKEN);
 
-const dataDir = path.dirname(new URL(import.meta.url).pathname);
+const memoryStore = new Map<string, any>();
 
 if (!HAS_DB_CONFIG) {
-  console.warn('⚠️  SurrealDB configuration missing - using local JSON storage');
+  console.warn('⚠️  SurrealDB configuration missing - using in-memory storage');
 }
 
 async function dbQuery(query: string, vars?: Record<string, any>) {
@@ -35,7 +32,7 @@ async function dbQuery(query: string, vars?: Record<string, any>) {
 
 export async function read<T>(name: string, fallback: T): Promise<T> {
   if (!HAS_DB_CONFIG) {
-    return readFromFile(name, fallback);
+    return readFromMemory(name, fallback);
   }
 
   try {
@@ -59,7 +56,7 @@ export async function read<T>(name: string, fallback: T): Promise<T> {
 
 export async function write<T>(name: string, data: T): Promise<void> {
   if (!HAS_DB_CONFIG) {
-    return writeToFile(name, data);
+    return writeToMemory(name, data);
   }
 
   try {
@@ -81,27 +78,20 @@ export async function write<T>(name: string, data: T): Promise<void> {
   }
 }
 
-async function readFromFile<T>(name: string, fallback: T): Promise<T> {
-  const filePath = path.join(dataDir, `${name}.json`);
-
-  try {
-    const content = await readFile(filePath, 'utf-8');
-    const parsed = JSON.parse(content) as T;
-    console.log(`📁 Loaded ${name} from local storage (${filePath})`);
-    return parsed;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      console.error(`Error reading ${name} from file:`, error);
-    }
-
-    console.log(`📁 No local data for ${name}, using fallback and creating file`);
-    await writeToFile(name, fallback);
-    return fallback;
+function readFromMemory<T>(name: string, fallback: T): T {
+  if (memoryStore.has(name)) {
+    const stored = memoryStore.get(name);
+    console.log(`📁 Loaded ${name} from memory`);
+    return JSON.parse(JSON.stringify(stored)) as T;
   }
+  
+  console.log(`📁 No data in memory for ${name}, using fallback`);
+  writeToMemory(name, fallback);
+  return JSON.parse(JSON.stringify(fallback)) as T;
 }
 
-async function writeToFile<T>(name: string, data: T): Promise<void> {
-  const filePath = path.join(dataDir, `${name}.json`);
-  await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
-  console.log(`✅ Wrote ${name} to local storage (${filePath})`);
+function writeToMemory<T>(name: string, data: T): void {
+  memoryStore.set(name, JSON.parse(JSON.stringify(data)));
+  const count = Array.isArray(data) ? data.length : 1;
+  console.log(`✅ Wrote ${count} item(s) to memory store [${name}]`);
 }
