@@ -35,24 +35,67 @@ export default function DebugAuthScreen() {
     }
     
     setIsChecking(true);
+    setBackendStatus('🔄 Verificando...');
+    setLastError('');
+    setLastResult('');
     console.log('🔍 DEBUG: Checking backend...');
+    
     try {
       const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
       console.log('🔍 DEBUG: Base URL:', baseUrl);
       
-      const response = await fetch(`${baseUrl}/ping`);
-      const data = await response.json();
-      console.log('🔍 DEBUG: Backend ping response:', data);
-      setBackendStatus(data.ok ? '✅ Backend Online' : '❌ Backend Error');
+      if (!baseUrl) {
+        throw new Error('EXPO_PUBLIC_RORK_API_BASE_URL não está configurado');
+      }
+
+      console.log('🔍 DEBUG: Step 1 - Testing /ping endpoint...');
+      const pingResponse = await fetch(`${baseUrl}/ping`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
       
-      console.log('🔍 DEBUG: Ensuring seeds...');
+      console.log('🔍 DEBUG: Ping response status:', pingResponse.status, pingResponse.statusText);
+      console.log('🔍 DEBUG: Ping response headers:', Object.fromEntries(pingResponse.headers.entries()));
+      
+      const pingText = await pingResponse.text();
+      console.log('🔍 DEBUG: Ping response text (first 200 chars):', pingText.substring(0, 200));
+      
+      let pingData;
+      try {
+        pingData = JSON.parse(pingText);
+        console.log('🔍 DEBUG: Ping parsed JSON:', pingData);
+      } catch (parseError) {
+        console.error('🔍 DEBUG: Failed to parse ping response as JSON:', parseError);
+        setBackendStatus('❌ Backend retornou resposta inválida');
+        setLastError(`Response não é JSON: ${pingText.substring(0, 100)}`);
+        return;
+      }
+      
+      if (!pingData.ok) {
+        setBackendStatus('❌ Backend ping failed');
+        setLastError('Backend ping retornou ok: false');
+        return;
+      }
+      
+      setBackendStatus('✅ Ping OK - Testando tRPC...');
+      setLastResult(`Ping: ${JSON.stringify(pingData)}`);
+      
+      console.log('🔍 DEBUG: Step 2 - Testing tRPC ensureSeeds...');
       const seedResult = await ensureSeedsMutation.mutateAsync();
       console.log('🔍 DEBUG: Seeds result:', seedResult);
       
-      console.log('🔍 DEBUG: Users from seeds:', seedResult);
-    } catch (error) {
+      setBackendStatus('✅ Backend Online & tRPC OK');
+      setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
+    } catch (error: any) {
       console.error('🔍 DEBUG: Backend check error:', error);
-      setBackendStatus('❌ Backend Offline: ' + String(error));
+      console.error('🔍 DEBUG: Error stack:', error?.stack);
+      console.error('🔍 DEBUG: Error name:', error?.name);
+      console.error('🔍 DEBUG: Error message:', error?.message);
+      
+      setBackendStatus('❌ Backend Error');
+      setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
     } finally {
       setIsChecking(false);
     }

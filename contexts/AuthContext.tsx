@@ -48,7 +48,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
     };
     init();
-  }, [ensureSeedsMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
 
