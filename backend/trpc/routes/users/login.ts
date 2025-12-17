@@ -38,6 +38,10 @@ export default publicProcedure
     console.log('🔐 LOGIN success:', { email, ok: true, userId: user.id });
 
     return {
-      user: userWithoutPassword,
+      user: {
+        ...userWithoutPassword,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      },
     };
   });

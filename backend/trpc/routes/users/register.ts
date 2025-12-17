@@ -54,6 +54,10 @@ export default publicProcedure
     console.log('📝 REGISTER success:', { email, userId: newUser.id });
 
     return {
-      user: userWithoutPassword,
+      user: {
+        ...userWithoutPassword,
+        createdAt: newUser.createdAt.toISOString(),
+        updatedAt: newUser.updatedAt.toISOString(),
+      },
     };
   });

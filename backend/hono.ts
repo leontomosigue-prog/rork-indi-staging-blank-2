@@ -103,6 +103,13 @@ app.use(
   trpcServer({
     router: appRouter,
     createContext,
+    responseMeta() {
+      return {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      };
+    },
   })
 );
 
