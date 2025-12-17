@@ -1,285 +1,192 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { User } from '@/types';
+import { trpc } from '@/lib/trpc';
 
-const STORAGE_KEYS = {
-  CURRENT_USER: '@indi:user',
-  USERS_DB: '@indi:usersDb',
-  BIOMETRIC_ENABLED: '@indi:biometricEnabled',
+type UpdateUserInput = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  cpf?: string;
+  birthDate?: string;
+  companyName?: string;
+  cnpj?: string;
+  profileImageUrl?: string;
+  fullName?: string;
 };
 
-const MOCK_USERS: User[] = [
-  {
-    id: '1',
-    type: 'employee',
-    email: 'admin@indi.test',
-    fullName: 'Admin Teste',
-    roles: ['Admin', 'Vendas', 'Locação', 'Assistência Técnica', 'Peças'],
-    lgpdConsent: true,
-    lgpdConsentDate: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    type: 'employee',
-    email: 'vendas@indi.test',
-    fullName: 'Vendas Teste',
-    roles: ['Vendas'],
-    lgpdConsent: true,
-    lgpdConsentDate: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    type: 'employee',
-    email: 'locacao@indi.test',
-    fullName: 'Locação Teste',
-    roles: ['Locação'],
-    lgpdConsent: true,
-    lgpdConsentDate: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    type: 'employee',
-    email: 'assistencia@indi.test',
-    fullName: 'Assistência Teste',
-    roles: ['Assistência Técnica'],
-    lgpdConsent: true,
-    lgpdConsentDate: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    type: 'employee',
-    email: 'pecas@indi.test',
-    fullName: 'Peças Teste',
-    roles: ['Peças'],
-    lgpdConsent: true,
-    lgpdConsentDate: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '6',
-    type: 'client',
-    email: 'cliente@indi.test',
-    fullName: 'Cliente Teste',
-    phone: '11999999999',
-    birthDate: '1990-01-01',
-    cpf: '12345678900',
-    companyName: 'Empresa Teste Ltda',
-    cnpj: '12345678000190',
-    lgpdConsent: true,
-    lgpdConsentDate: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+const STORAGE_KEY = '@indi:userId';
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
-  const [user, setUser] = useState<User | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
+  
+  const userQuery = trpc.users.getMe.useQuery(
+    { userId: userId! },
+    { enabled: !!userId, retry: false }
+  );
 
   useEffect(() => {
-    initializeAuth();
-  }, []);
+    const init = async () => {
+      console.log('AuthContext: Initializing with backend...');
+      try {
+        await ensureSeedsMutation.mutateAsync();
+        console.log('AuthContext: Seeds ensured');
 
-  const initializeAuth = async () => {
-    console.log('AuthContext: Initializing authentication...');
-    try {
-      const storedUser = await AsyncStorage.getItem('@indi:user');
-      console.log('AuthContext: Stored user:', storedUser ? 'Found' : 'Not found');
-      
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const storedUserId = await AsyncStorage.getItem(STORAGE_KEY);
+        console.log('AuthContext: Stored userId:', storedUserId ? 'Found' : 'Not found');
+        
+        if (storedUserId) {
+          setUserId(storedUserId);
+        }
+      } catch (error) {
+        console.error('AuthContext: Initialization error:', error);
+      } finally {
+        setIsLoading(false);
       }
+    };
+    init();
+  }, [ensureSeedsMutation]);
 
-      const existingDb = await AsyncStorage.getItem(STORAGE_KEYS.USERS_DB);
-      if (!existingDb) {
-        console.log('AuthContext: Initializing mock database');
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(MOCK_USERS));
-      }
 
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setBiometricAvailable(compatible && enrolled);
-      console.log('AuthContext: Biometric available:', compatible && enrolled);
-    } catch (error) {
-      console.error('AuthContext: Initialization error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+  const loginMutation = trpc.users.login.useMutation();
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    const normalizedEmail = (email || "").trim().toLowerCase();
-    const normalizedPassword = (password || "").trim();
-    
-    console.log('🔵 LOGIN MOCK start:', normalizedEmail);
-    console.log('🔵 LOGIN MOCK password length:', normalizedPassword.length);
+    console.log('🔵 LOGIN tRPC start:', email);
     
     try {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(normalizedEmail)) {
-        console.log('🔴 LOGIN MOCK: Invalid email format');
-        return false;
+      const result = await loginMutation.mutateAsync({ email, password });
+      
+      if (result.user) {
+        console.log('🔵 LOGIN tRPC success:', result.user.id);
+        setUserId(result.user.id);
+        await AsyncStorage.setItem(STORAGE_KEY, result.user.id);
+        return true;
       }
       
-      if (normalizedPassword.length < 6) {
-        console.log('🔴 LOGIN MOCK: Password too short (min 6 chars)');
-        return false;
-      }
-      
-      const mockUser = MOCK_USERS.find(u => u.email.toLowerCase() === normalizedEmail);
-      
-      if (!mockUser) {
-        console.log('🔴 LOGIN MOCK: Email not found in mock users');
-        return false;
-      }
-      
-      console.log('🔵 LOGIN MOCK user found:', JSON.stringify(mockUser, null, 2));
-      console.log('🔵 LOGIN MOCK setUser call...');
-      setUser(mockUser);
-      console.log('🔵 LOGIN MOCK setUser OK');
-      
-      console.log('🔵 LOGIN MOCK storage write...');
-      await AsyncStorage.setItem('@indi:user', JSON.stringify(mockUser));
-      console.log('🔵 LOGIN MOCK storage OK');
-      console.log('🔵 LOGIN MOCK return true');
-      
-      return true;
-    } catch (error) {
-      console.error('🔴 LOGIN MOCK error:', error);
-      console.error('🔴 LOGIN MOCK error details:', JSON.stringify(error, null, 2));
-      return false;
-    }
-  }, []);
-
-  const loginWithBiometric = useCallback(async (): Promise<boolean> => {
-    console.log('AuthContext: Biometric login attempt');
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Autenticar com biometria',
-        fallbackLabel: 'Usar senha',
-      });
-
-      if (result.success) {
-        const storedUser = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-          return true;
-        }
-      }
       return false;
     } catch (error) {
-      console.error('AuthContext: Biometric login error:', error);
+      console.error('🔴 LOGIN tRPC error:', error);
       return false;
     }
-  }, []);
+  }, [loginMutation]);
 
-  const register = useCallback(async (userData: Partial<User>, password: string): Promise<boolean> => {
-    console.log('AuthContext: register called');
+  const registerMutation = trpc.users.register.useMutation();
+
+  const register = useCallback(async (data: {
+    email: string;
+    password: string;
+    name: string;
+    cpf?: string;
+    birthDate?: string;
+    companyName?: string;
+    cnpj?: string;
+  }): Promise<boolean> => {
+    console.log('AuthContext: register called with backend');
     try {
-      const dbString = await AsyncStorage.getItem(STORAGE_KEYS.USERS_DB);
-      const users: User[] = dbString ? JSON.parse(dbString) : [];
-
-      const existingUser = users.find(u => u.email.toLowerCase() === userData.email?.toLowerCase());
-      if (existingUser) {
-        console.log('AuthContext: Email already exists');
-        return false;
+      const result = await registerMutation.mutateAsync(data);
+      
+      if (result.user) {
+        console.log('AuthContext: Registration successful');
+        setUserId(result.user.id);
+        await AsyncStorage.setItem(STORAGE_KEY, result.user.id);
+        return true;
       }
-
-      const newUser: User = {
-        id: Date.now().toString(),
-        type: 'client',
-        email: userData.email || '',
-        fullName: userData.fullName || '',
-        phone: userData.phone,
-        birthDate: userData.birthDate,
-        cpf: userData.cpf,
-        companyName: userData.companyName,
-        cnpj: userData.cnpj,
-        lgpdConsent: userData.lgpdConsent || false,
-        lgpdConsentDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      users.push(newUser);
-      await AsyncStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(users));
-      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(newUser));
-      setUser(newUser);
-      console.log('AuthContext: Registration successful');
-      return true;
+      
+      return false;
     } catch (error) {
       console.error('AuthContext: Registration error:', error);
       return false;
     }
-  }, []);
+  }, [registerMutation]);
 
   const logout = useCallback(async () => {
     console.log('AuthContext: logout called');
     try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-      setUser(null);
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      setUserId(null);
       console.log('AuthContext: Logout successful');
     } catch (error) {
       console.error('AuthContext: Logout error:', error);
     }
   }, []);
 
-  const updateUser = useCallback(async (updates: Partial<User>): Promise<boolean> => {
-    console.log('AuthContext: updateUser called');
-    if (!user) return false;
+  const updateMeMutation = trpc.users.updateMe.useMutation({
+    onSuccess: () => {
+      userQuery.refetch();
+    },
+  });
+
+  const updateUser = useCallback(async (updates: UpdateUserInput): Promise<boolean> => {
+    console.log('AuthContext: updateUser called with backend');
+    if (!userId) return false;
 
     try {
-      const updatedUser = {
-        ...user,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
-
-      const dbString = await AsyncStorage.getItem(STORAGE_KEYS.USERS_DB);
-      const users: User[] = dbString ? JSON.parse(dbString) : [];
-      const userIndex = users.findIndex(u => u.id === user.id);
-
-      if (userIndex >= 0) {
-        users[userIndex] = updatedUser;
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(users));
-      }
-
-      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      const backendUpdates: any = { userId };
+      if (updates.name !== undefined) backendUpdates.name = updates.name;
+      if (updates.fullName !== undefined) backendUpdates.name = updates.fullName;
+      if (updates.email !== undefined) backendUpdates.email = updates.email;
+      if (updates.cpf !== undefined) backendUpdates.cpf = updates.cpf;
+      if (updates.birthDate !== undefined) backendUpdates.birthDate = updates.birthDate;
+      if (updates.companyName !== undefined) backendUpdates.companyName = updates.companyName;
+      if (updates.cnpj !== undefined) backendUpdates.cnpj = updates.cnpj;
+      
+      await updateMeMutation.mutateAsync(backendUpdates as any);
       console.log('AuthContext: User updated successfully');
       return true;
     } catch (error) {
       console.error('AuthContext: Update user error:', error);
       return false;
     }
-  }, [user]);
+  }, [userId, updateMeMutation]);
 
-  const toggleBiometric = useCallback(async () => {
-    console.log('AuthContext: Toggle biometric');
-  }, []);
+  const user = useMemo(() => {
+    if (!userQuery.data) return null;
+    
+    const backendUser = userQuery.data;
+    const mappedRoles = backendUser.roles?.map((r: string) => {
+      const roleMap: Record<string, string> = {
+        'admin': 'Admin',
+        'sales': 'Vendas',
+        'rental': 'Locação',
+        'technical': 'Assistência Técnica',
+        'parts': 'Peças',
+      };
+      return roleMap[r] || r;
+    }) || [];
+
+    return {
+      id: backendUser.id,
+      type: mappedRoles.length > 0 ? 'employee' as const : 'client' as const,
+      email: backendUser.email,
+      fullName: backendUser.name,
+      phone: undefined as string | undefined,
+      birthDate: backendUser.birthDate,
+      cpf: backendUser.cpf,
+      companyName: backendUser.companyName,
+      cnpj: backendUser.cnpj,
+      roles: mappedRoles,
+      profileImageUrl: undefined as string | undefined,
+      lgpdConsent: true,
+      lgpdConsentDate: new Date().toISOString(),
+      createdAt: new Date(backendUser.createdAt).toISOString(),
+      updatedAt: new Date(backendUser.updatedAt).toISOString(),
+    };
+  }, [userQuery.data]);
 
   return useMemo(() => ({
     user,
-    isLoading,
+    isLoading: isLoading || userQuery.isLoading,
     isAuthenticated: !!user,
-    biometricAvailable,
+    biometricAvailable: false,
     login,
-    loginWithBiometric,
+    loginWithBiometric: async () => false,
     register,
     logout,
     updateUser,
-    toggleBiometric,
-  }), [user, isLoading, biometricAvailable, login, loginWithBiometric, register, logout, updateUser, toggleBiometric]);
+    toggleBiometric: async () => {},
+  }), [user, isLoading, userQuery.isLoading, login, register, logout, updateUser]);
 });

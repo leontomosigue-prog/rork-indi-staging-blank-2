@@ -14,7 +14,7 @@ import {
 import { Stack } from 'expo-router';
 import { Plus, Edit2, Trash2, User } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMockData } from '@/contexts/MockDataContext';
+import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
 import type { Role, User as UserType } from '@/types';
 import Logo from '@/components/Logo';
@@ -35,8 +35,16 @@ const AVAILABLE_ROLES: { value: Role; label: string }[] = [
 
 export default function EmployeesScreen() {
   const { user } = useAuth();
-  const { listColaboradores, criarColaborador, atualizarColaborador, removerColaborador, isLoading } =
-    useMockData();
+  const employeesQuery = trpc.users.listEmployees.useQuery();
+  const createEmployeeMutation = trpc.users.createEmployee.useMutation({
+    onSuccess: () => employeesQuery.refetch(),
+  });
+  const updateEmployeeMutation = trpc.users.updateEmployee.useMutation({
+    onSuccess: () => employeesQuery.refetch(),
+  });
+  const removeEmployeeMutation = trpc.users.removeEmployee.useMutation({
+    onSuccess: () => employeesQuery.refetch(),
+  });
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,7 +57,32 @@ export default function EmployeesScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const isAdmin = user?.roles?.includes('Admin');
-  const colaboradores = listColaboradores().filter(c => !c.roles?.includes('Admin'));
+  const isLoading = employeesQuery.isLoading;
+  
+  const colaboradores = (employeesQuery.data || [])
+    .filter((emp: any) => {
+      const hasAdmin = emp.roles?.some((r: string) => r === 'admin');
+      return !hasAdmin;
+    })
+    .map((emp: any) => ({
+      id: emp.id,
+      type: 'employee' as const,
+      email: emp.email,
+      fullName: emp.name,
+      roles: emp.roles?.map((r: string) => {
+        const roleMap: Record<string, Role> = {
+          'sales': 'Vendas',
+          'rental': 'Locação',
+          'technical': 'Assistência Técnica',
+          'parts': 'Peças',
+        };
+        return roleMap[r] || r as Role;
+      }) || [],
+      lgpdConsent: true,
+      lgpdConsentDate: new Date().toISOString(),
+      createdAt: new Date(emp.createdAt).toISOString(),
+      updatedAt: new Date(emp.updatedAt).toISOString(),
+    }));
 
   const resetForm = () => {
     setFormData({ email: '', fullName: '', roles: [], password: '' });
@@ -115,30 +148,50 @@ export default function EmployeesScreen() {
     setIsSaving(true);
     try {
       if (editingId) {
-        await atualizarColaborador(editingId, {
-          fullName: formData.fullName,
-          roles: formData.roles,
+        const backendRoles = formData.roles.map(r => {
+          const roleMap: Record<Role, string> = {
+            'Vendas': 'sales',
+            'Locação': 'rental',
+            'Assistência Técnica': 'technical',
+            'Peças': 'parts',
+            'Admin': 'admin',
+          };
+          return roleMap[r];
+        }) as ('admin' | 'sales' | 'rental' | 'technical' | 'parts')[];
+        
+        await updateEmployeeMutation.mutateAsync({
+          id: editingId,
+          name: formData.fullName,
+          roles: backendRoles,
         });
       } else {
-        const existing = listColaboradores().find(
-          (c) => c.email.toLowerCase() === formData.email.toLowerCase()
-        );
-        if (existing) {
-          Alert.alert('Erro', 'E-mail já cadastrado');
-          return;
-        }
-        await criarColaborador({
+        const backendRoles = formData.roles.map(r => {
+          const roleMap: Record<Role, string> = {
+            'Vendas': 'sales',
+            'Locação': 'rental',
+            'Assistência Técnica': 'technical',
+            'Peças': 'parts',
+            'Admin': 'admin',
+          };
+          return roleMap[r];
+        }) as ('admin' | 'sales' | 'rental' | 'technical' | 'parts')[];
+        
+        await createEmployeeMutation.mutateAsync({
           email: formData.email,
-          fullName: formData.fullName,
-          roles: formData.roles,
+          name: formData.fullName,
+          roles: backendRoles,
           password: formData.password,
         });
       }
       setIsModalVisible(false);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving employee:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao salvar o colaborador');
+      if (error.message?.includes('already registered')) {
+        Alert.alert('Erro', 'E-mail já cadastrado');
+      } else {
+        Alert.alert('Erro', 'Ocorreu um erro ao salvar o colaborador');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -154,7 +207,12 @@ export default function EmployeesScreen() {
           text: 'Excluir',
           style: 'destructive',
           onPress: async () => {
-            await removerColaborador(id);
+            try {
+              await removeEmployeeMutation.mutateAsync({ id });
+            } catch (error) {
+              console.error('Error deleting employee:', error);
+              Alert.alert('Erro', 'Ocorreu um erro ao excluir o colaborador');
+            }
           },
         },
       ]

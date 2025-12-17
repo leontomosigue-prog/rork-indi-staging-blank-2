@@ -3,8 +3,13 @@ import hiRoute from "./routes/example/hi/route";
 
 import ensureSeeds from "./routes/users/ensureSeeds";
 import login from "./routes/users/login";
+import register from "./routes/users/register";
 import getMe from "./routes/users/getMe";
 import updateMe from "./routes/users/updateMe";
+import listEmployees from "./routes/users/listEmployees";
+import createEmployee from "./routes/users/createEmployee";
+import updateEmployee from "./routes/users/updateEmployee";
+import removeEmployee from "./routes/users/removeEmployee";
 
 import listMachines from "./routes/machines/list";
 import createMachine from "./routes/machines/create";
@@ -41,8 +46,13 @@ export const appRouter = createTRPCRouter({
   users: createTRPCRouter({
     ensureSeeds,
     login,
+    register,
     getMe,
     updateMe,
+    listEmployees,
+    createEmployee,
+    updateEmployee,
+    removeEmployee,
   }),
   machines: createTRPCRouter({
     list: listMachines,
