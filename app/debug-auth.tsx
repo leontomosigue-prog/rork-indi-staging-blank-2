@@ -40,7 +40,7 @@ export default function DebugAuthScreen() {
       const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
       console.log('🔍 DEBUG: Base URL:', baseUrl);
       
-      const response = await fetch(`${baseUrl}/api/ping`);
+      const response = await fetch(`${baseUrl}/ping`);
       const data = await response.json();
       console.log('🔍 DEBUG: Backend ping response:', data);
       setBackendStatus(data.ok ? '✅ Backend Online' : '❌ Backend Error');
