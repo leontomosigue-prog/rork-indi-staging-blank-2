@@ -23,11 +23,18 @@ export default function DebugAuthScreen() {
   const [lastResult, setLastResult] = useState('');
   const [backendStatus, setBackendStatus] = useState('Verificando...');
   const [backendUsers, setBackendUsers] = useState<any[]>([]);
+  const [isChecking, setIsChecking] = useState(false);
   
   const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
   const loginMutation = trpc.users.login.useMutation();
 
   const checkBackend = useCallback(async () => {
+    if (isChecking) {
+      console.log('🔍 DEBUG: Already checking, skipping...');
+      return;
+    }
+    
+    setIsChecking(true);
     console.log('🔍 DEBUG: Checking backend...');
     try {
       const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
@@ -38,26 +45,30 @@ export default function DebugAuthScreen() {
       console.log('🔍 DEBUG: Backend ping response:', data);
       setBackendStatus(data.ok ? '✅ Backend Online' : '❌ Backend Error');
       
+      console.log('🔍 DEBUG: Ensuring seeds...');
       const seedResult = await ensureSeedsMutation.mutateAsync();
       console.log('🔍 DEBUG: Seeds result:', seedResult);
       
+      console.log('🔍 DEBUG: Fetching users from backend...');
       const usersResponse = await fetch(`${baseUrl}/backend/data/users.json`);
       if (usersResponse.ok) {
         const users = await usersResponse.json();
         console.log('🔍 DEBUG: Users loaded:', users);
         setBackendUsers(users);
+      } else {
+        console.log('🔍 DEBUG: Could not load users.json');
       }
     } catch (error) {
       console.error('🔍 DEBUG: Backend check error:', error);
       setBackendStatus('❌ Backend Offline: ' + String(error));
+    } finally {
+      setIsChecking(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isChecking, ensureSeedsMutation]);
 
   useEffect(() => {
     checkBackend();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [checkBackend]);
 
   const handleAdminLogin = async () => {
     console.log('🟣 DEBUG: Starting admin login...');
@@ -126,8 +137,12 @@ export default function DebugAuthScreen() {
         <Text style={styles.sectionTitle}>Status do Backend</Text>
         <Text style={styles.infoText}>{backendStatus}</Text>
         <Text style={styles.infoText}>Base URL: {process.env.EXPO_PUBLIC_RORK_API_BASE_URL}</Text>
-        <Pressable style={styles.smallButton} onPress={checkBackend}>
-          <Text style={styles.smallButtonText}>Recarregar</Text>
+        <Pressable style={styles.smallButton} onPress={checkBackend} disabled={isChecking}>
+          {isChecking ? (
+            <ActivityIndicator size="small" color={Colors.text} />
+          ) : (
+            <Text style={styles.smallButtonText}>Recarregar</Text>
+          )}
         </Pressable>
       </View>
 
