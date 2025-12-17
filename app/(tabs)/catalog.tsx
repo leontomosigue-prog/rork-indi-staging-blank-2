@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
-import { Plus, Edit2, Trash2, Package, Truck, ShoppingBag, ImageIcon } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Plus, Edit2, Trash2, Package, Truck, ShoppingBag, ImageIcon, Upload } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -82,6 +84,7 @@ export default function CatalogScreen() {
     imageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isPickingImage, setIsPickingImage] = useState(false);
 
   const isAdmin = user?.roles?.includes('Admin');
 
@@ -265,6 +268,76 @@ export default function CatalogScreen() {
         },
       },
     ]);
+  };
+
+  const pickImageForMachine = async () => {
+    console.log('CatalogScreen: Solicitando permissão para acessar galeria');
+    
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'É necessário permitir o acesso à galeria para adicionar imagens.');
+        return;
+      }
+    }
+
+    try {
+      setIsPickingImage(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'] as any,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      console.log('CatalogScreen: Resultado da seleção de imagem:', result);
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        console.log('CatalogScreen: Imagem selecionada:', imageUri);
+        setMachineFormData({ ...machineFormData, imageUrl: imageUri });
+      }
+    } catch (error) {
+      console.error('CatalogScreen: Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao selecionar a imagem.');
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
+  const pickImageForPart = async () => {
+    console.log('CatalogScreen: Solicitando permissão para acessar galeria');
+    
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'É necessário permitir o acesso à galeria para adicionar imagens.');
+        return;
+      }
+    }
+
+    try {
+      setIsPickingImage(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'] as any,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      console.log('CatalogScreen: Resultado da seleção de imagem:', result);
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        console.log('CatalogScreen: Imagem selecionada:', imageUri);
+        setPartFormData({ ...partFormData, imageUrl: imageUri });
+      }
+    } catch (error) {
+      console.error('CatalogScreen: Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao selecionar a imagem.');
+    } finally {
+      setIsPickingImage(false);
+    }
   };
 
   const renderMachine = ({ item }: any) => (
@@ -631,7 +704,20 @@ export default function CatalogScreen() {
               </>
             )}
 
-            <Text style={styles.label}>URL da Imagem (opcional)</Text>
+            <Text style={styles.label}>Imagem (opcional)</Text>
+            <View style={styles.imageInputContainer}>
+              <TouchableOpacity
+                style={styles.uploadButton}
+                onPress={activeTab === 'pecas' ? pickImageForPart : pickImageForMachine}
+                disabled={isPickingImage}
+              >
+                <Upload size={20} color={Colors.primary} />
+                <Text style={styles.uploadButtonText}>
+                  {isPickingImage ? 'Carregando...' : 'Upload de imagem'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.imageHelperText}>ou insira a URL abaixo</Text>
+            </View>
             <TextInput
               style={styles.input}
               value={activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl}
@@ -644,13 +730,25 @@ export default function CatalogScreen() {
               placeholderTextColor={Colors.textSecondary}
             />
             {(activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl) && (
-              <Image
-                source={{
-                  uri: activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl,
-                }}
-                style={styles.imagePreview}
-                contentFit="cover"
-              />
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{
+                    uri: activeTab === 'pecas' ? partFormData.imageUrl : machineFormData.imageUrl,
+                  }}
+                  style={styles.imagePreview}
+                  contentFit="cover"
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={() =>
+                    activeTab === 'pecas'
+                      ? setPartFormData({ ...partFormData, imageUrl: '' })
+                      : setMachineFormData({ ...machineFormData, imageUrl: '' })
+                  }
+                >
+                  <Text style={styles.removeImageText}>Remover imagem</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             <TouchableOpacity
@@ -877,11 +975,51 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600' as const,
   },
+  imageInputContainer: {
+    marginBottom: 12,
+    gap: 8,
+  },
+  uploadButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 16,
+  },
+  uploadButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.primary,
+  },
+  imageHelperText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center' as const,
+  },
+  imagePreviewContainer: {
+    marginTop: 12,
+    gap: 12,
+  },
   imagePreview: {
     width: '100%',
     height: 200,
     borderRadius: 8,
-    marginTop: 12,
+  },
+  removeImageButton: {
+    backgroundColor: Colors.error,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center' as const,
+  },
+  removeImageText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
   submitButton: {
     backgroundColor: Colors.primary,
