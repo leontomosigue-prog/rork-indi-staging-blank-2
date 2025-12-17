@@ -22,7 +22,7 @@ export default function DebugAuthScreen() {
   const [lastError, setLastError] = useState('');
   const [lastResult, setLastResult] = useState('');
   const [backendStatus, setBackendStatus] = useState('Verificando...');
-  const [backendUsers, setBackendUsers] = useState<any[]>([]);
+
   const [isChecking, setIsChecking] = useState(false);
   
   const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
@@ -49,15 +49,7 @@ export default function DebugAuthScreen() {
       const seedResult = await ensureSeedsMutation.mutateAsync();
       console.log('🔍 DEBUG: Seeds result:', seedResult);
       
-      console.log('🔍 DEBUG: Fetching users from backend...');
-      const usersResponse = await fetch(`${baseUrl}/backend/data/users.json`);
-      if (usersResponse.ok) {
-        const users = await usersResponse.json();
-        console.log('🔍 DEBUG: Users loaded:', users);
-        setBackendUsers(users);
-      } else {
-        console.log('🔍 DEBUG: Could not load users.json');
-      }
+      console.log('🔍 DEBUG: Users from seeds:', seedResult);
     } catch (error) {
       console.error('🔍 DEBUG: Backend check error:', error);
       setBackendStatus('❌ Backend Offline: ' + String(error));
@@ -147,16 +139,9 @@ export default function DebugAuthScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Usuários no Backend</Text>
-        {backendUsers.length > 0 ? (
-          backendUsers.map((u, i) => (
-            <Text key={i} style={styles.infoText}>
-              {u.email} - {u.passwordHash}
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.noUser}>Nenhum usuário encontrado</Text>
-        )}
+        <Text style={styles.sectionTitle}>Info do Backend</Text>
+        <Text style={styles.infoText}>Ambiente: {process.env.NODE_ENV || 'development'}</Text>
+        <Text style={styles.infoText}>SurrealDB: {process.env.EXPO_PUBLIC_RORK_DB_ENDPOINT ? 'Configurado' : 'Memory Store'}</Text>
       </View>
 
       <View style={styles.section}>
