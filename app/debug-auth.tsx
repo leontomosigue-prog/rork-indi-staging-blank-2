@@ -64,11 +64,11 @@ export default function DebugAuthScreen() {
     } finally {
       setIsChecking(false);
     }
-  }, [isChecking]);
+  }, [isChecking, ensureSeedsMutation]);
 
   useEffect(() => {
     checkBackend();
-  }, []);
+  }, [checkBackend]);
 
   const handleAdminLogin = async () => {
     console.log('🟣 DEBUG: Starting admin login...');
