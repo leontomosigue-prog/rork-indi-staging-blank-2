@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Send, CheckCircle } from 'lucide-react-native';
+import { Send, CheckCircle, MessageCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -22,10 +22,11 @@ export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
-  const { conversas, listMensagens, enviarMensagem, marcarConversaComoResolvida } = useMockData();
+  const { conversas, listMensagens, enviarMensagem, marcarConversaComoResolvida, reabrirConversa } = useMockData();
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const conversa = conversas.find((c) => c.id === id);
@@ -75,12 +76,7 @@ export default function ChatScreen() {
             setIsResolving(true);
             try {
               await marcarConversaComoResolvida(id);
-              Alert.alert('Sucesso', 'Conversa marcada como resolvida', [
-                {
-                  text: 'OK',
-                  onPress: () => router.back(),
-                },
-              ]);
+              Alert.alert('Sucesso', 'Conversa marcada como resolvida');
             } catch (error) {
               console.error('Error resolving conversation:', error);
               Alert.alert('Erro', 'Ocorreu um erro ao resolver a conversa');
@@ -91,6 +87,21 @@ export default function ChatScreen() {
         },
       ]
     );
+  };
+
+  const handleReopen = async () => {
+    if (!user?.id || !id) return;
+
+    setIsReopening(true);
+    try {
+      await reabrirConversa(id);
+      Alert.alert('Sucesso', 'Conversa reaberta. Você pode continuar atendendo o cliente.');
+    } catch (error) {
+      console.error('Error reopening conversation:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao reabrir a conversa');
+    } finally {
+      setIsReopening(false);
+    }
   };
 
   const renderMessage = ({ item }: any) => {
@@ -212,9 +223,27 @@ export default function ChatScreen() {
       )}
 
       {conversa.status === 'resolvida' && (
-        <View style={styles.resolvedBanner}>
-          <CheckCircle size={20} color="#10b981" />
-          <Text style={styles.resolvedText}>Conversa resolvida</Text>
+        <View style={styles.resolvedContainer}>
+          <View style={styles.resolvedBanner}>
+            <CheckCircle size={20} color="#10b981" />
+            <Text style={styles.resolvedText}>Conversa resolvida</Text>
+          </View>
+          {user?.type === 'employee' && (
+            <TouchableOpacity
+              style={[styles.reopenButton, isReopening && styles.reopenButtonDisabled]}
+              onPress={handleReopen}
+              disabled={isReopening}
+            >
+              {isReopening ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MessageCircle size={20} color="#fff" />
+                  <Text style={styles.reopenButtonText}>Atender</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </KeyboardAvoidingView>
@@ -334,19 +363,43 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     opacity: 0.5,
   },
+  resolvedContainer: {
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
   resolvedBanner: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: 8,
-    padding: 16,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderTopWidth: 1,
-    borderTopColor: Colors.success,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   resolvedText: {
     fontSize: 14,
     fontWeight: '600' as const,
     color: '#10b981',
+  },
+  reopenButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    backgroundColor: Colors.primary,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  reopenButtonDisabled: {
+    opacity: 0.6,
+  },
+  reopenButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600' as const,
   },
 });

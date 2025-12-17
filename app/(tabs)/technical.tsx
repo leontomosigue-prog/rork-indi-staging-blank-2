@@ -81,7 +81,10 @@ export default function TechnicalScreen() {
 
   const renderConversa = ({ item }: any) => (
     <TouchableOpacity
-      style={styles.conversaCard}
+      style={[
+        styles.conversaCard,
+        item.status === 'resolvida' && styles.conversaCardResolvida,
+      ]}
       onPress={() => router.push(`/chat/${item.id}` as any)}
     >
       <View style={styles.conversaHeader}>
@@ -108,9 +111,16 @@ export default function TechnicalScreen() {
         )}
       </View>
       <Text style={styles.conversaClient}>{item.clienteNome}</Text>
-      <Text style={styles.conversaDate}>
-        {new Date(item.updatedAt).toLocaleDateString('pt-BR')}
-      </Text>
+      <View style={styles.conversaFooter}>
+        <Text style={styles.conversaDate}>
+          {new Date(item.updatedAt).toLocaleDateString('pt-BR')}
+        </Text>
+        {item.status === 'resolvida' && (
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>Resolvida</Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 
@@ -257,6 +267,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  conversaCardResolvida: {
+    backgroundColor: '#f9fafb',
+    opacity: 0.85,
+  },
   conversaHeader: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -283,9 +297,25 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginBottom: 4,
   },
+  conversaFooter: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
   conversaDate: {
     fontSize: 12,
     color: Colors.textLight,
+  },
+  statusBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#10b981',
   },
   emptyContainer: {
     flex: 1,

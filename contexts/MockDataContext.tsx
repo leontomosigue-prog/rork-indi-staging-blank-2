@@ -364,6 +364,23 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     }
   }, [conversas]);
 
+  const reabrirConversa = useCallback(async (conversaId: string): Promise<void> => {
+    console.log('MockDataContext: Reabrindo conversa:', conversaId);
+    try {
+      const updated = conversas.map(c =>
+        c.id === conversaId
+          ? { ...c, status: 'aberta' as const, updatedAt: new Date().toISOString() }
+          : c
+      );
+
+      setConversas(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.CONVERSAS, JSON.stringify(updated));
+      console.log('MockDataContext: Conversa reaberta com sucesso');
+    } catch (error) {
+      console.error('MockDataContext: Erro ao reabrir conversa:', error);
+    }
+  }, [conversas]);
+
   const listMensagens = useCallback((conversaId: string): Mensagem[] => {
     return mensagens.filter(m => m.conversaId === conversaId).sort((a, b) => 
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -606,6 +623,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     listConversasPorArea,
     criarConversa,
     marcarConversaComoResolvida,
+    reabrirConversa,
     listMensagens,
     enviarMensagem,
     listMaquinas,
@@ -633,6 +651,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     listConversasPorArea,
     criarConversa,
     marcarConversaComoResolvida,
+    reabrirConversa,
     listMensagens,
     enviarMensagem,
     listMaquinas,
