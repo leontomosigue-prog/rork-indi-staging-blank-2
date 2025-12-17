@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -12,6 +12,7 @@ import {
 
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { trpc } from '@/lib/trpc';
 
 export default function DebugAuthScreen() {
   const insets = useSafeAreaInsets();
@@ -20,6 +21,41 @@ export default function DebugAuthScreen() {
   const [isLoadingClient, setIsLoadingClient] = useState(false);
   const [lastError, setLastError] = useState('');
   const [lastResult, setLastResult] = useState('');
+  const [backendStatus, setBackendStatus] = useState('Verificando...');
+  const [backendUsers, setBackendUsers] = useState<any[]>([]);
+  
+  const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
+  const loginMutation = trpc.users.login.useMutation();
+
+  const checkBackend = useCallback(async () => {
+    console.log('🔍 DEBUG: Checking backend...');
+    try {
+      const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+      console.log('🔍 DEBUG: Base URL:', baseUrl);
+      
+      const response = await fetch(`${baseUrl}/api/ping`);
+      const data = await response.json();
+      console.log('🔍 DEBUG: Backend ping response:', data);
+      setBackendStatus(data.ok ? '✅ Backend Online' : '❌ Backend Error');
+      
+      const seedResult = await ensureSeedsMutation.mutateAsync();
+      console.log('🔍 DEBUG: Seeds result:', seedResult);
+      
+      const usersResponse = await fetch(`${baseUrl}/backend/data/users.json`);
+      if (usersResponse.ok) {
+        const users = await usersResponse.json();
+        console.log('🔍 DEBUG: Users loaded:', users);
+        setBackendUsers(users);
+      }
+    } catch (error) {
+      console.error('🔍 DEBUG: Backend check error:', error);
+      setBackendStatus('❌ Backend Offline: ' + String(error));
+    }
+  }, [ensureSeedsMutation]);
+
+  useEffect(() => {
+    checkBackend();
+  }, [checkBackend]);
 
   const handleAdminLogin = async () => {
     console.log('🟣 DEBUG: Starting admin login...');
@@ -28,6 +64,14 @@ export default function DebugAuthScreen() {
     setIsLoadingAdmin(true);
     
     try {
+      console.log('🟣 DEBUG: Calling tRPC login mutation directly...');
+      const directResult = await loginMutation.mutateAsync({
+        email: 'admin@indi.com',
+        password: 'admin123'
+      });
+      console.log('🟣 DEBUG: Direct tRPC result:', directResult);
+      
+      console.log('🟣 DEBUG: Calling AuthContext login...');
       const result = await login('admin@indi.com', 'admin123');
       console.log('🟣 DEBUG: Admin login result:', result);
       setLastResult(`Admin login: ${result ? 'SUCCESS' : 'FAILED'}`);
@@ -37,9 +81,9 @@ export default function DebugAuthScreen() {
         router.replace('/(tabs)/home' as any);
         console.log('🟣 DEBUG: Navigation called');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('🟣 DEBUG: Admin login error:', error);
-      setLastError(String(error));
+      setLastError(error?.message || String(error));
     } finally {
       setIsLoadingAdmin(false);
     }
@@ -76,6 +120,28 @@ export default function DebugAuthScreen() {
     >
       <Text style={styles.title}>Debug de Autenticação</Text>
       
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Status do Backend</Text>
+        <Text style={styles.infoText}>{backendStatus}</Text>
+        <Text style={styles.infoText}>Base URL: {process.env.EXPO_PUBLIC_RORK_API_BASE_URL}</Text>
+        <Pressable style={styles.smallButton} onPress={checkBackend}>
+          <Text style={styles.smallButtonText}>Recarregar</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Usuários no Backend</Text>
+        {backendUsers.length > 0 ? (
+          backendUsers.map((u, i) => (
+            <Text key={i} style={styles.infoText}>
+              {u.email} - {u.passwordHash}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.noUser}>Nenhum usuário encontrado</Text>
+        )}
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Usuário Atual</Text>
         {user ? (
@@ -242,5 +308,18 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontSize: 16,
     fontWeight: '600' as const,
+  },
+  smallButton: {
+    backgroundColor: Colors.border,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  smallButtonText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '500' as const,
   },
 });
