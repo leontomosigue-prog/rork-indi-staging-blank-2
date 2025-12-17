@@ -51,11 +51,13 @@ export default function DebugAuthScreen() {
       console.error('🔍 DEBUG: Backend check error:', error);
       setBackendStatus('❌ Backend Offline: ' + String(error));
     }
-  }, [ensureSeedsMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     checkBackend();
-  }, [checkBackend]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAdminLogin = async () => {
     console.log('🟣 DEBUG: Starting admin login...');
