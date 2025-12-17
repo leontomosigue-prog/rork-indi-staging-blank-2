@@ -1,0 +1,56 @@
+[
+  {
+    "id": "admin_user_001",
+    "name": "Admin INDI",
+    "email": "admin@indi.com",
+    "passwordHash": "admin123",
+    "roles": ["admin", "sales", "rental", "technical", "parts"],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
+  },
+  {
+    "id": "sales_user_001",
+    "name": "João Silva (Vendas)",
+    "email": "vendas@indi.com",
+    "passwordHash": "vendas123",
+    "roles": ["sales"],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
+  },
+  {
+    "id": "rental_user_001",
+    "name": "Maria Santos (Locação)",
+    "email": "locacao@indi.com",
+    "passwordHash": "locacao123",
+    "roles": ["rental"],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
+  },
+  {
+    "id": "tech_user_001",
+    "name": "Carlos Oliveira (Técnico)",
+    "email": "tecnico@indi.com",
+    "passwordHash": "tecnico123",
+    "roles": ["technical"],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
+  },
+  {
+    "id": "parts_user_001",
+    "name": "Ana Costa (Peças)",
+    "email": "pecas@indi.com",
+    "passwordHash": "pecas123",
+    "roles": ["parts"],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
+  },
+  {
+    "id": "client_user_001",
+    "name": "Cliente Teste",
+    "email": "cliente@indi.com",
+    "passwordHash": "cliente123",
+    "roles": [],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
+  }
+]
