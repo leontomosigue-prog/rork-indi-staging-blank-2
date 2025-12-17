@@ -15,11 +15,16 @@ export default publicProcedure
     const email = (input.email || "").trim().toLowerCase();
     const password = (input.password || "").trim();
     
-    console.log('🔐 LOGIN attempt:', email);
+    console.log('🔐 LOGIN attempt:', { email, password });
     const users = await read<User[]>("users", []);
     console.log('🔐 Users in DB:', users.length);
+    console.log('🔐 All users emails:', users.map(u => ({ email: u.email, hasPassword: !!u.passwordHash })));
 
     const user = users.find(u => u.email.toLowerCase() === email);
+    console.log('🔐 User found:', !!user);
+    if (user) {
+      console.log('🔐 Password comparison:', { stored: user.passwordHash, provided: password, match: user.passwordHash === password });
+    }
 
     if (!user || user.passwordHash !== password) {
       console.log('🔐 LOGIN failed:', { email, ok: false, userFound: !!user });
