@@ -103,7 +103,8 @@ export default function DebugAuthScreen() {
 
   useEffect(() => {
     checkBackend();
-  }, [checkBackend]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAdminLogin = async () => {
     console.log('🟣 DEBUG: Starting admin login...');
