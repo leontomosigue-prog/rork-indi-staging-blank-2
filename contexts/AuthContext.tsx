@@ -48,7 +48,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
     };
     init();
-  }, [ensureSeedsMutation]);
+  }, []);
 
 
 
