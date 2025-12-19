@@ -1,3 +1,4 @@
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +32,7 @@ export default function DebugAuthScreen() {
   const [lastResult, setLastResult] = useState('');
   const [backendStatus, setBackendStatus] = useState('Verificando...');
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [copyFeedback, setCopyFeedback] = useState('');
   const hasCheckedRef = useRef(false);
   
   const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
@@ -47,6 +49,33 @@ export default function DebugAuthScreen() {
     setLogs([]);
     addLog('info', 'Logs limpos');
   }, [addLog]);
+
+  const copyLogs = useCallback(async () => {
+    try {
+      let logText = '=== LOGS DE DEBUG - FRONTEND/BACKEND ===\n\n';
+      logText += `Platform: ${Platform.OS}\n`;
+      logText += `Base URL: ${process.env.EXPO_PUBLIC_RORK_API_BASE_URL}\n`;
+      logText += `Ambiente: ${process.env.NODE_ENV || 'development'}\n`;
+      logText += `Timestamp: ${new Date().toISOString()}\n`;
+      logText += '\n' + '='.repeat(50) + '\n\n';
+      
+      logs.forEach((log, index) => {
+        logText += `[${index + 1}] [${log.type.toUpperCase()}] ${log.timestamp}\n`;
+        logText += `${log.message}\n`;
+        if (log.details) {
+          logText += `Details: ${typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}\n`;
+        }
+        logText += '\n';
+      });
+      
+      await Clipboard.setStringAsync(logText);
+      setCopyFeedback('✅ Copiado!');
+      setTimeout(() => setCopyFeedback(''), 2000);
+    } catch (error) {
+      setCopyFeedback('❌ Erro ao copiar');
+      setTimeout(() => setCopyFeedback(''), 2000);
+    }
+  }, [logs]);
 
   const checkBackend = useCallback(async (force = false) => {
     if (!force && hasCheckedRef.current) {
@@ -365,9 +394,17 @@ export default function DebugAuthScreen() {
       <View style={styles.section}>
         <View style={styles.logHeader}>
           <Text style={styles.sectionTitle}>Logs de Comunicação Frontend-Backend</Text>
-          <Pressable style={styles.clearButton} onPress={clearLogs}>
-            <Text style={styles.clearButtonText}>Limpar</Text>
-          </Pressable>
+          <View style={styles.logActions}>
+            {copyFeedback ? (
+              <Text style={styles.copyFeedback}>{copyFeedback}</Text>
+            ) : null}
+            <Pressable style={styles.copyButton} onPress={copyLogs}>
+              <Text style={styles.copyButtonText}>Copiar Logs</Text>
+            </Pressable>
+            <Pressable style={styles.clearButton} onPress={clearLogs}>
+              <Text style={styles.clearButtonText}>Limpar</Text>
+            </Pressable>
+          </View>
         </View>
         <ScrollView style={styles.logContainer} nestedScrollEnabled>
           {logs.map((log, index) => (
@@ -564,6 +601,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  logActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  copyButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  copyButtonText: {
+    color: Colors.surface,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
   clearButton: {
     backgroundColor: '#333',
     paddingHorizontal: 12,
@@ -574,5 +627,10 @@ const styles = StyleSheet.create({
     color: '#ddd',
     fontSize: 12,
     fontWeight: '500' as const,
+  },
+  copyFeedback: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '600' as const,
   },
 });
