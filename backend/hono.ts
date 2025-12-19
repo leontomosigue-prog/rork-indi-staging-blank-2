@@ -97,12 +97,12 @@ initializeData().catch(error => {
 });
 
 app.use('*', cors({
-  origin: (origin) => origin || '*',
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  exposeHeaders: ['Content-Length'],
-  maxAge: 600,
-  credentials: true,
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposeHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400,
+  credentials: false,
 }));
 
 app.get('/ping', (c) => c.json({ ok: true, at: new Date().toISOString() }));
