@@ -8,11 +8,19 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
 } from 'react-native';
 
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
+
+interface LogEntry {
+  timestamp: string;
+  type: 'info' | 'success' | 'error' | 'request' | 'response';
+  message: string;
+  details?: any;
+}
 
 export default function DebugAuthScreen() {
   const insets = useSafeAreaInsets();
@@ -22,14 +30,27 @@ export default function DebugAuthScreen() {
   const [lastError, setLastError] = useState('');
   const [lastResult, setLastResult] = useState('');
   const [backendStatus, setBackendStatus] = useState('Verificando...');
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const hasCheckedRef = useRef(false);
   
   const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
   const loginMutation = trpc.users.login.useMutation();
 
+  const addLog = useCallback((type: LogEntry['type'], message: string, details?: any) => {
+    const timestamp = new Date().toISOString();
+    const logEntry: LogEntry = { timestamp, type, message, details };
+    console.log(`[${type.toUpperCase()}] ${message}`, details || '');
+    setLogs(prev => [...prev, logEntry]);
+  }, []);
+
+  const clearLogs = useCallback(() => {
+    setLogs([]);
+    addLog('info', 'Logs limpos');
+  }, [addLog]);
+
   const checkBackend = useCallback(async (force = false) => {
     if (!force && hasCheckedRef.current) {
-      console.log('🔍 DEBUG: Already checked, skipping...');
+      addLog('info', 'Verificação já realizada, pulando...');
       return;
     }
     
@@ -37,76 +58,156 @@ export default function DebugAuthScreen() {
     setBackendStatus('🔄 Verificando...');
     setLastError('');
     setLastResult('');
-    console.log('🔍 DEBUG: Checking backend...');
+    addLog('info', '═══════════════════════════════════════');
+    addLog('info', 'INICIANDO VERIFICAÇÃO COMPLETA DO BACKEND');
+    addLog('info', '═══════════════════════════════════════');
     
     try {
       const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-      console.log('🔍 DEBUG: Base URL:', baseUrl);
+      addLog('info', `Platform: ${Platform.OS}`);
+      addLog('info', `Base URL configurada: ${baseUrl || 'NÃO CONFIGURADO'}`);
+      addLog('info', `Ambiente: ${process.env.NODE_ENV || 'development'}`);
       
       if (!baseUrl) {
         throw new Error('EXPO_PUBLIC_RORK_API_BASE_URL não está configurado');
       }
 
-      console.log('🔍 DEBUG: Step 1 - Testing /ping endpoint...');
-      console.log('🔍 DEBUG: Fetching:', `${baseUrl}/ping`);
+      // Teste 1: Root endpoint
+      addLog('info', '\n--- TESTE 1: ROOT ENDPOINT ---');
+      addLog('request', `GET ${baseUrl}/`, { method: 'GET' });
+      try {
+        const rootResponse = await fetch(`${baseUrl}/`, {
+          method: 'GET',
+          headers: {
+            'Accept': '*/*',
+            'User-Agent': `RorkApp/${Platform.OS}`,
+          },
+        });
+        addLog('response', `Status: ${rootResponse.status} ${rootResponse.statusText}`, {
+          headers: Object.fromEntries(rootResponse.headers.entries()),
+        });
+        const rootText = await rootResponse.text();
+        addLog('success', `Resposta: ${rootText}`);
+      } catch (err: any) {
+        addLog('error', `Erro no root endpoint: ${err.message}`, err);
+      }
+
+      // Teste 2: Ping endpoint
+      addLog('info', '\n--- TESTE 2: PING ENDPOINT ---');
+      addLog('request', `GET ${baseUrl}/ping`, { 
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      
       const pingResponse = await fetch(`${baseUrl}/ping`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': `RorkApp/${Platform.OS}`,
         },
       });
       
-      console.log('🔍 DEBUG: Ping response status:', pingResponse.status, pingResponse.statusText);
-      console.log('🔍 DEBUG: Ping response headers:', Object.fromEntries(pingResponse.headers.entries()));
-      console.log('🔍 DEBUG: Content-Type:', pingResponse.headers.get('content-type'));
+      addLog('response', `Status: ${pingResponse.status} ${pingResponse.statusText}`, {
+        headers: Object.fromEntries(pingResponse.headers.entries()),
+        contentType: pingResponse.headers.get('content-type'),
+        cors: {
+          'access-control-allow-origin': pingResponse.headers.get('access-control-allow-origin'),
+          'access-control-allow-methods': pingResponse.headers.get('access-control-allow-methods'),
+          'access-control-allow-headers': pingResponse.headers.get('access-control-allow-headers'),
+        }
+      });
       
       const pingText = await pingResponse.text();
-      console.log('🔍 DEBUG: Ping response length:', pingText.length);
-      console.log('🔍 DEBUG: Ping response full text:', pingText);
-      console.log('🔍 DEBUG: Ping response text (first 200 chars):', pingText.substring(0, 200));
+      addLog('info', `Resposta raw (${pingText.length} bytes): ${pingText}`);
       
       let pingData;
       try {
         pingData = JSON.parse(pingText);
-        console.log('🔍 DEBUG: Ping parsed JSON:', pingData);
-      } catch (parseError) {
-        console.error('🔍 DEBUG: Failed to parse ping response as JSON:', parseError);
+        addLog('success', 'JSON parseado com sucesso', pingData);
+      } catch (parseError: any) {
+        addLog('error', `Falha ao parsear JSON: ${parseError.message}`);
         setBackendStatus('❌ Backend retornou resposta inválida');
         setLastError(`Response não é JSON: ${pingText.substring(0, 100)}`);
         return;
       }
       
       if (!pingResponse.ok) {
+        addLog('error', `HTTP Error ${pingResponse.status}`);
         setBackendStatus(`❌ Backend HTTP ${pingResponse.status}`);
         setLastError(`HTTP ${pingResponse.status}: ${pingText.substring(0, 200)}`);
         return;
       }
       
       if (!pingData.ok) {
+        addLog('error', 'Ping retornou ok: false');
         setBackendStatus('❌ Backend ping failed');
         setLastError('Backend ping retornou ok: false');
         return;
       }
       
+      addLog('success', '✅ Ping endpoint OK');
       setBackendStatus('✅ Ping OK - Testando tRPC...');
       setLastResult(`Ping: ${JSON.stringify(pingData)}`);
       
-      console.log('🔍 DEBUG: Step 2 - Testing tRPC ensureSeeds...');
+      // Teste 3: tRPC ensureSeeds
+      addLog('info', '\n--- TESTE 3: tRPC ensureSeeds ---');
+      addLog('request', `POST ${baseUrl}/trpc/users.ensureSeeds`, {
+        method: 'POST',
+        transformer: 'superjson'
+      });
+      
       const seedResult = await ensureSeedsMutation.mutateAsync();
-      console.log('🔍 DEBUG: Seeds result:', seedResult);
+      addLog('response', 'Seeds result recebido', seedResult);
+      addLog('success', '✅ tRPC ensureSeeds OK');
+      
+      // Teste 4: Verificar todas as rotas tRPC disponíveis
+      addLog('info', '\n--- TESTE 4: ROTAS tRPC DISPONÍVEIS ---');
+      addLog('info', 'users.login - POST /trpc/users.login');
+      addLog('info', 'users.register - POST /trpc/users.register');
+      addLog('info', 'users.getMe - GET /trpc/users.getMe');
+      addLog('info', 'users.updateMe - POST /trpc/users.updateMe');
+      addLog('info', 'users.ensureSeeds - POST /trpc/users.ensureSeeds');
+      addLog('info', 'users.listEmployees - GET /trpc/users.listEmployees');
+      addLog('info', 'users.createEmployee - POST /trpc/users.createEmployee');
+      addLog('info', 'users.updateEmployee - POST /trpc/users.updateEmployee');
+      addLog('info', 'users.removeEmployee - POST /trpc/users.removeEmployee');
+      addLog('info', 'machines.list - GET /trpc/machines.list');
+      addLog('info', 'machines.create - POST /trpc/machines.create');
+      addLog('info', 'machines.update - POST /trpc/machines.update');
+      addLog('info', 'machines.remove - POST /trpc/machines.remove');
+      addLog('info', 'parts.list - GET /trpc/parts.list');
+      addLog('info', 'parts.create - POST /trpc/parts.create');
+      addLog('info', 'parts.update - POST /trpc/parts.update');
+      addLog('info', 'parts.remove - POST /trpc/parts.remove');
+      addLog('info', 'tickets.listByArea - GET /trpc/tickets.listByArea');
+      addLog('info', 'tickets.listMine - GET /trpc/tickets.listMine');
+      addLog('info', 'tickets.create - POST /trpc/tickets.create');
+      addLog('info', 'tickets.assign - POST /trpc/tickets.assign');
+      addLog('info', 'tickets.updateStatus - POST /trpc/tickets.updateStatus');
+      addLog('info', 'messages.listByConversation - GET /trpc/messages.listByConversation');
+      addLog('info', 'messages.send - POST /trpc/messages.send');
+      addLog('info', 'conversations.listMine - GET /trpc/conversations.listMine');
+      addLog('info', 'conversations.createForTicket - POST /trpc/conversations.createForTicket');
+      addLog('info', 'conversations.archiveForUser - POST /trpc/conversations.archiveForUser');
+      addLog('info', 'rentalOffers.list - GET /trpc/rentalOffers.list');
+      addLog('info', 'rentalOffers.create - POST /trpc/rentalOffers.create');
+      addLog('info', 'rentalOffers.update - POST /trpc/rentalOffers.update');
+      addLog('info', 'rentalOffers.remove - POST /trpc/rentalOffers.remove');
       
       setBackendStatus('✅ Backend Online & tRPC OK');
       setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
+      addLog('success', '\n✅ TODAS AS VERIFICAÇÕES CONCLUÍDAS COM SUCESSO');
     } catch (error: any) {
-      console.error('🔍 DEBUG: Backend check error:', error);
-      console.error('🔍 DEBUG: Error stack:', error?.stack);
-      console.error('🔍 DEBUG: Error name:', error?.name);
-      console.error('🔍 DEBUG: Error message:', error?.message);
+      addLog('error', `Erro fatal: ${error?.name || 'Error'}: ${error?.message || String(error)}`, {
+        stack: error?.stack,
+        cause: error?.cause,
+      });
       
       setBackendStatus('❌ Backend Error');
       setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
     }
-  }, [ensureSeedsMutation]);
+  }, [ensureSeedsMutation, addLog]);
 
   useEffect(() => {
     checkBackend();
@@ -114,31 +215,34 @@ export default function DebugAuthScreen() {
   }, []);
 
   const handleAdminLogin = async () => {
-    console.log('🟣 DEBUG: Starting admin login...');
+    addLog('info', '\n--- TESTE DE LOGIN ADMIN ---');
     setLastError('');
     setLastResult('');
     setIsLoadingAdmin(true);
     
     try {
-      console.log('🟣 DEBUG: Calling tRPC login mutation directly...');
-      const directResult = await loginMutation.mutateAsync({
-        email: 'admin@indi.com',
-        password: 'admin123'
-      });
-      console.log('🟣 DEBUG: Direct tRPC result:', directResult);
+      const credentials = { email: 'admin@indi.com', password: 'admin123' };
+      addLog('request', 'Chamando tRPC login mutation', credentials);
       
-      console.log('🟣 DEBUG: Calling AuthContext login...');
+      const directResult = await loginMutation.mutateAsync(credentials);
+      addLog('response', 'Resultado tRPC direto', directResult);
+      
+      addLog('info', 'Chamando AuthContext login...');
       const result = await login('admin@indi.com', 'admin123');
-      console.log('🟣 DEBUG: Admin login result:', result);
+      addLog(result ? 'success' : 'error', `Login result: ${result ? 'SUCCESS' : 'FAILED'}`);
       setLastResult(`Admin login: ${result ? 'SUCCESS' : 'FAILED'}`);
       
       if (result) {
-        console.log('🟣 DEBUG: Navigating to home...');
+        addLog('info', 'Navegando para /(tabs)/home...');
         router.replace('/(tabs)/home' as any);
-        console.log('🟣 DEBUG: Navigation called');
+        addLog('success', 'Navegação executada');
       }
     } catch (error: any) {
-      console.error('🟣 DEBUG: Admin login error:', error);
+      addLog('error', `Erro no login admin: ${error?.message || String(error)}`, {
+        name: error?.name,
+        stack: error?.stack,
+        cause: error?.cause,
+      });
       setLastError(error?.message || String(error));
     } finally {
       setIsLoadingAdmin(false);
@@ -146,23 +250,28 @@ export default function DebugAuthScreen() {
   };
 
   const handleClientLogin = async () => {
-    console.log('🟣 DEBUG: Starting client login...');
+    addLog('info', '\n--- TESTE DE LOGIN CLIENTE ---');
     setLastError('');
     setLastResult('');
     setIsLoadingClient(true);
     
     try {
+      addLog('request', 'Chamando AuthContext login', {
+        email: 'cliente@indi.com',
+        password: '***'
+      });
+      
       const result = await login('cliente@indi.com', 'cliente123');
-      console.log('🟣 DEBUG: Client login result:', result);
+      addLog(result ? 'success' : 'error', `Login result: ${result ? 'SUCCESS' : 'FAILED'}`);
       setLastResult(`Client login: ${result ? 'SUCCESS' : 'FAILED'}`);
       
       if (result) {
-        console.log('🟣 DEBUG: Navigating to home...');
+        addLog('info', 'Navegando para /(tabs)/home...');
         router.replace('/(tabs)/home' as any);
-        console.log('🟣 DEBUG: Navigation called');
+        addLog('success', 'Navegação executada');
       }
-    } catch (error) {
-      console.error('🟣 DEBUG: Client login error:', error);
+    } catch (error: any) {
+      addLog('error', `Erro no login cliente: ${String(error)}`, error);
       setLastError(String(error));
     } finally {
       setIsLoadingClient(false);
@@ -254,12 +363,44 @@ export default function DebugAuthScreen() {
       ) : null}
 
       <View style={styles.section}>
+        <View style={styles.logHeader}>
+          <Text style={styles.sectionTitle}>Logs de Comunicação Frontend-Backend</Text>
+          <Pressable style={styles.clearButton} onPress={clearLogs}>
+            <Text style={styles.clearButtonText}>Limpar</Text>
+          </Pressable>
+        </View>
+        <ScrollView style={styles.logContainer} nestedScrollEnabled>
+          {logs.map((log, index) => (
+            <View key={index} style={styles.logEntry}>
+              <Text style={[
+                styles.logText,
+                log.type === 'success' && styles.logSuccess,
+                log.type === 'error' && styles.logError,
+                log.type === 'request' && styles.logRequest,
+                log.type === 'response' && styles.logResponse,
+              ]}>
+                [{log.timestamp.split('T')[1].split('.')[0]}] {log.message}
+              </Text>
+              {log.details && (
+                <Text style={styles.logDetails}>
+                  {typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}
+                </Text>
+              )}
+            </View>
+          ))}
+          {logs.length === 0 && (
+            <Text style={styles.noLogs}>Nenhum log ainda. Execute uma verificação ou login.</Text>
+          )}
+        </ScrollView>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Instruções</Text>
         <Text style={styles.instructionsText}>
-          1. Verifique os logs no console do servidor e do app{'\n'}
-          2. Pressione um dos botões acima{'\n'}
-          3. Veja se navega para /(tabs)/home{'\n'}
-          4. Confira o usuário atual após login{'\n'}
+          1. Verifique os logs acima para ver todas as comunicações{'\n'}
+          2. Pressione &quot;Recarregar&quot; para testar novamente{'\n'}
+          3. Use os botões de login para testar autenticação{'\n'}
+          4. Todos os requests e responses estão nos logs{'\n'}
           {'\n'}
           Credenciais dos seeds:{'\n'}
           • admin@indi.com / admin123{'\n'}
@@ -372,6 +513,66 @@ const styles = StyleSheet.create({
   smallButtonText: {
     color: Colors.text,
     fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  logContainer: {
+    maxHeight: 400,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
+  },
+  logEntry: {
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  logText: {
+    fontSize: 12,
+    color: '#ddd',
+    fontFamily: 'monospace' as const,
+  },
+  logSuccess: {
+    color: '#10b981',
+  },
+  logError: {
+    color: '#ef4444',
+  },
+  logRequest: {
+    color: '#3b82f6',
+  },
+  logResponse: {
+    color: '#8b5cf6',
+  },
+  logDetails: {
+    fontSize: 11,
+    color: '#999',
+    fontFamily: 'monospace' as const,
+    marginTop: 4,
+    marginLeft: 8,
+  },
+  noLogs: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic' as const,
+    textAlign: 'center',
+    padding: 20,
+  },
+  logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  clearButton: {
+    backgroundColor: '#333',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  clearButtonText: {
+    color: '#ddd',
+    fontSize: 12,
     fontWeight: '500' as const,
   },
 });
