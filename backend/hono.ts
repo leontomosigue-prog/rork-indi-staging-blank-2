@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './trpc/app-router';
 import { createContext } from './trpc/create-context';
@@ -94,6 +95,15 @@ async function initializeData() {
 initializeData().catch(error => {
   console.error('❌ Failed to initialize data:', error);
 });
+
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Content-Length'],
+  maxAge: 600,
+  credentials: true,
+}));
 
 app.get('/ping', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 app.get('/', (c) => c.text('API OK'));
