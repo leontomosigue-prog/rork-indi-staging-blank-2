@@ -71,7 +71,7 @@ export default function DebugAuthScreen() {
       await Clipboard.setStringAsync(logText);
       setCopyFeedback('✅ Copiado!');
       setTimeout(() => setCopyFeedback(''), 2000);
-    } catch (error) {
+    } catch {
       setCopyFeedback('❌ Erro ao copiar');
       setTimeout(() => setCopyFeedback(''), 2000);
     }
@@ -121,8 +121,25 @@ export default function DebugAuthScreen() {
         addLog('error', `Erro no root endpoint: ${err.message}`, err);
       }
 
-      // Teste 2: Ping endpoint
-      addLog('info', '\n--- TESTE 2: PING ENDPOINT ---');
+      // Teste 2: Health/API check
+      addLog('info', '\n--- TESTE 2: HEALTH CHECK ---');
+      addLog('request', `GET ${baseUrl}/api/health`, { method: 'GET' });
+      try {
+        const healthResponse = await fetch(`${baseUrl}/api/health`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+        });
+        addLog('response', `Status: ${healthResponse.status}`, {
+          headers: Object.fromEntries(healthResponse.headers.entries()),
+        });
+        const healthText = await healthResponse.text();
+        addLog('info', `Response: ${healthText}`);
+      } catch (err: any) {
+        addLog('error', `Health check error: ${err.message}`);
+      }
+
+      // Teste 3: Ping endpoint
+      addLog('info', '\n--- TESTE 3: PING ENDPOINT ---');
       addLog('request', `GET ${baseUrl}/ping`, { 
         method: 'GET',
         headers: { 'Accept': 'application/json' }
@@ -179,8 +196,47 @@ export default function DebugAuthScreen() {
       setBackendStatus('✅ Ping OK - Testando tRPC...');
       setLastResult(`Ping: ${JSON.stringify(pingData)}`);
       
-      // Teste 3: tRPC ensureSeeds
-      addLog('info', '\n--- TESTE 3: tRPC ensureSeeds ---');
+      // Teste 4: tRPC endpoint direto (raw fetch)
+      addLog('info', '\n--- TESTE 4: tRPC ENDPOINT (RAW FETCH) ---');
+      const trpcUrl = `${baseUrl}/trpc/users.ensureSeeds`;
+      addLog('request', `POST ${trpcUrl}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' }
+      });
+      
+      try {
+        const trpcRawResponse = await fetch(trpcUrl, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({}),
+        });
+        
+        addLog('response', `tRPC Raw Status: ${trpcRawResponse.status}`, {
+          headers: Object.fromEntries(trpcRawResponse.headers.entries()),
+          cors: {
+            'access-control-allow-origin': trpcRawResponse.headers.get('access-control-allow-origin'),
+            'access-control-allow-methods': trpcRawResponse.headers.get('access-control-allow-methods'),
+            'access-control-allow-headers': trpcRawResponse.headers.get('access-control-allow-headers'),
+          }
+        });
+        
+        const trpcRawText = await trpcRawResponse.text();
+        addLog('info', `tRPC Raw Response (${trpcRawText.length} bytes): ${trpcRawText.substring(0, 200)}`);
+        
+        if (trpcRawResponse.ok) {
+          addLog('success', '✅ tRPC endpoint accessible via raw fetch');
+        } else {
+          addLog('error', `❌ tRPC endpoint returned ${trpcRawResponse.status}`);
+        }
+      } catch (err: any) {
+        addLog('error', `tRPC Raw fetch failed: ${err.message}`, err);
+      }
+      
+      // Teste 5: tRPC ensureSeeds via tRPC client
+      addLog('info', '\n--- TESTE 5: tRPC ensureSeeds (via tRPC Client) ---');
       addLog('request', `POST ${baseUrl}/trpc/users.ensureSeeds`, {
         method: 'POST',
         transformer: 'superjson'
@@ -190,8 +246,8 @@ export default function DebugAuthScreen() {
       addLog('response', 'Seeds result recebido', seedResult);
       addLog('success', '✅ tRPC ensureSeeds OK');
       
-      // Teste 4: Verificar todas as rotas tRPC disponíveis
-      addLog('info', '\n--- TESTE 4: ROTAS tRPC DISPONÍVEIS ---');
+      // Teste 6: Verificar todas as rotas tRPC disponíveis
+      addLog('info', '\n--- TESTE 6: ROTAS tRPC DISPONÍVEIS ---');
       addLog('info', 'users.login - POST /trpc/users.login');
       addLog('info', 'users.register - POST /trpc/users.register');
       addLog('info', 'users.getMe - GET /trpc/users.getMe');
