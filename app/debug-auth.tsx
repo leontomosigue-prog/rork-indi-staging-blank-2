@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -22,19 +22,18 @@ export default function DebugAuthScreen() {
   const [lastError, setLastError] = useState('');
   const [lastResult, setLastResult] = useState('');
   const [backendStatus, setBackendStatus] = useState('Verificando...');
-
-  const [isChecking, setIsChecking] = useState(false);
+  const hasCheckedRef = useRef(false);
   
   const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
   const loginMutation = trpc.users.login.useMutation();
 
-  const checkBackend = useCallback(async () => {
-    if (isChecking) {
-      console.log('🔍 DEBUG: Already checking, skipping...');
+  const checkBackend = useCallback(async (force = false) => {
+    if (!force && hasCheckedRef.current) {
+      console.log('🔍 DEBUG: Already checked, skipping...');
       return;
     }
     
-    setIsChecking(true);
+    hasCheckedRef.current = true;
     setBackendStatus('🔄 Verificando...');
     setLastError('');
     setLastResult('');
@@ -106,10 +105,8 @@ export default function DebugAuthScreen() {
       
       setBackendStatus('❌ Backend Error');
       setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
-    } finally {
-      setIsChecking(false);
     }
-  }, [isChecking, ensureSeedsMutation]);
+  }, [ensureSeedsMutation]);
 
   useEffect(() => {
     checkBackend();
@@ -183,12 +180,11 @@ export default function DebugAuthScreen() {
         <Text style={styles.sectionTitle}>Status do Backend</Text>
         <Text style={styles.infoText}>{backendStatus}</Text>
         <Text style={styles.infoText}>Base URL: {process.env.EXPO_PUBLIC_RORK_API_BASE_URL}</Text>
-        <Pressable style={styles.smallButton} onPress={checkBackend} disabled={isChecking}>
-          {isChecking ? (
-            <ActivityIndicator size="small" color={Colors.text} />
-          ) : (
-            <Text style={styles.smallButtonText}>Recarregar</Text>
-          )}
+        <Pressable style={styles.smallButton} onPress={() => {
+          hasCheckedRef.current = false;
+          checkBackend(true);
+        }}>
+          <Text style={styles.smallButtonText}>Recarregar</Text>
         </Pressable>
       </View>
 
