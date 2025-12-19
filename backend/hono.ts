@@ -96,14 +96,16 @@ initializeData().catch(error => {
   console.error('❌ Failed to initialize data:', error);
 });
 
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposeHeaders: ['Content-Length', 'Content-Type'],
-  maxAge: 86400,
-  credentials: false,
-}));
+app.use('*', cors());
+
+app.options('*', (c) => {
+  c.status(204);
+  c.header('Access-Control-Allow-Origin', '*');
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD');
+  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  c.header('Access-Control-Max-Age', '86400');
+  return c.body(null);
+});
 
 app.get('/ping', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 app.get('/', (c) => c.text('API OK'));
