@@ -30,18 +30,18 @@ export default function LoginScreen() {
       console.log('🟢 login useEffect: user type:', user.type);
       console.log('🟢 login useEffect: user roles:', user.roles);
       try {
-        router.replace('/(tabs)/home');
+        router.replace('/(tabs)/home' as any);
         console.log('🟢 login useEffect: replace called');
       } catch (err) {
         console.log('🟡 login useEffect: replace failed, trying push...', err);
         try {
-          router.push('/(tabs)/home');
+          router.push('/(tabs)/home' as any);
           console.log('🟢 login useEffect: push called');
         } catch (err2) {
           console.log('🟡 login useEffect: push failed, trying setTimeout...', err2);
           setTimeout(() => {
             try {
-              router.replace('/(tabs)/home');
+              router.replace('/(tabs)/home' as any);
               console.log('🟢 login useEffect: setTimeout replace called');
             } catch (err3) {
               console.error('🔴 login useEffect: all navigation attempts failed', err3);

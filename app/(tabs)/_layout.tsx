@@ -12,7 +12,7 @@ export default function TabLayout() {
   }
 
   if (!user) {
-    return <Redirect href="/login" />;
+    return <Redirect href={"/login" as any} />;
   }
 
   const isAdmin = user.roles?.includes('Admin');
