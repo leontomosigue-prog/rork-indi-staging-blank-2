@@ -49,6 +49,7 @@ export default function DebugAuthScreen() {
       }
 
       console.log('🔍 DEBUG: Step 1 - Testing /ping endpoint...');
+      console.log('🔍 DEBUG: Fetching:', `${baseUrl}/ping`);
       const pingResponse = await fetch(`${baseUrl}/ping`, {
         method: 'GET',
         headers: {
@@ -58,8 +59,11 @@ export default function DebugAuthScreen() {
       
       console.log('🔍 DEBUG: Ping response status:', pingResponse.status, pingResponse.statusText);
       console.log('🔍 DEBUG: Ping response headers:', Object.fromEntries(pingResponse.headers.entries()));
+      console.log('🔍 DEBUG: Content-Type:', pingResponse.headers.get('content-type'));
       
       const pingText = await pingResponse.text();
+      console.log('🔍 DEBUG: Ping response length:', pingText.length);
+      console.log('🔍 DEBUG: Ping response full text:', pingText);
       console.log('🔍 DEBUG: Ping response text (first 200 chars):', pingText.substring(0, 200));
       
       let pingData;
@@ -70,6 +74,12 @@ export default function DebugAuthScreen() {
         console.error('🔍 DEBUG: Failed to parse ping response as JSON:', parseError);
         setBackendStatus('❌ Backend retornou resposta inválida');
         setLastError(`Response não é JSON: ${pingText.substring(0, 100)}`);
+        return;
+      }
+      
+      if (!pingResponse.ok) {
+        setBackendStatus(`❌ Backend HTTP ${pingResponse.status}`);
+        setLastError(`HTTP ${pingResponse.status}: ${pingText.substring(0, 200)}`);
         return;
       }
       
