@@ -100,9 +100,14 @@ app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposeHeaders: ['Content-Length', 'Content-Type'],
   maxAge: 86400,
-  credentials: false,
+  credentials: true,
 }));
+
+app.options('*', (c) => {
+  return c.body(null, 204);
+});
 
 app.get('/ping', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 app.get('/', (c) => c.text('API OK'));
