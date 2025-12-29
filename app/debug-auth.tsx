@@ -14,7 +14,7 @@ import {
 
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { trpc, resolveApiPrefix, clearPrefixCache, getTrpcUrl } from '@/lib/trpc';
 
 interface LogEntry {
   timestamp: string;
@@ -31,6 +31,8 @@ export default function DebugAuthScreen() {
   const [lastError, setLastError] = useState('');
   const [lastResult, setLastResult] = useState('');
   const [backendStatus, setBackendStatus] = useState('Verificando...');
+  const [detectedPrefix, setDetectedPrefix] = useState<string | null>(null);
+  const [backendSignature, setBackendSignature] = useState<any>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [copyFeedback, setCopyFeedback] = useState('');
   const hasCheckedRef = useRef(false);
@@ -87,6 +89,13 @@ export default function DebugAuthScreen() {
     setBackendStatus('🔄 Verificando...');
     setLastError('');
     setLastResult('');
+    setDetectedPrefix(null);
+    setBackendSignature(null);
+    
+    if (force) {
+      clearPrefixCache();
+    }
+    
     addLog('info', '═══════════════════════════════════════');
     addLog('info', 'INICIANDO VERIFICAÇÃO COMPLETA DO BACKEND');
     addLog('info', '═══════════════════════════════════════');
@@ -101,184 +110,93 @@ export default function DebugAuthScreen() {
         throw new Error('EXPO_PUBLIC_RORK_API_BASE_URL não está configurado');
       }
 
-      // Teste 1: Root endpoint
-      addLog('info', '\n--- TESTE 1: ROOT ENDPOINT ---');
-      addLog('request', `GET ${baseUrl}/`, { method: 'GET' });
+      // Teste 1: Detecção automática de prefixo
+      addLog('info', '\n--- TESTE 1: DETECÇÃO AUTOMÁTICA DE PREFIXO ---');
+      addLog('info', 'Testando prefixos: ["", "/api"]');
+      
+      let prefix: string;
       try {
-        const rootResponse = await fetch(`${baseUrl}/`, {
-          method: 'GET',
-          headers: {
-            'Accept': '*/*',
-            'User-Agent': `RorkApp/${Platform.OS}`,
-          },
-        });
-        addLog('response', `Status: ${rootResponse.status} ${rootResponse.statusText}`, {
-          headers: Object.fromEntries(rootResponse.headers.entries()),
-        });
-        const rootText = await rootResponse.text();
-        addLog('success', `Resposta: ${rootText}`);
+        prefix = await resolveApiPrefix(baseUrl);
+        setDetectedPrefix(prefix);
+        addLog('success', `✅ PREFIXO ESCOLHIDO: "${prefix}"`);
       } catch (err: any) {
-        addLog('error', `Erro no root endpoint: ${err.message}`, err);
+        addLog('error', `❌ Falha ao detectar prefixo: ${err.message}`);
+        setBackendStatus('❌ Backend inválido ou URL errada');
+        setLastError(err.message);
+        return;
       }
 
-      // Teste 2: Health/API check
-      addLog('info', '\n--- TESTE 2: HEALTH CHECK ---');
-      addLog('request', `GET ${baseUrl}/api/health`, { method: 'GET' });
-      try {
-        const healthResponse = await fetch(`${baseUrl}/api/health`, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-        });
-        addLog('response', `Status: ${healthResponse.status}`, {
-          headers: Object.fromEntries(healthResponse.headers.entries()),
-        });
-        const healthText = await healthResponse.text();
-        addLog('info', `Response: ${healthText}`);
-      } catch (err: any) {
-        addLog('error', `Health check error: ${err.message}`);
-      }
+      // Teste 2: Validar assinatura do backend
+      addLog('info', '\n--- TESTE 2: VALIDAÇÃO DE ASSINATURA ---');
+      const whoamiUrl = `${baseUrl}${prefix}/__whoami`;
+      addLog('request', `GET ${whoamiUrl}`);
+      
+      const whoamiResponse = await fetch(whoamiUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+      
+      addLog('response', `Status: ${whoamiResponse.status}`, {
+        headers: Object.fromEntries(whoamiResponse.headers.entries()),
+      });
+      
+      const whoamiData = await whoamiResponse.json();
+      setBackendSignature(whoamiData);
+      
+      addLog('success', `✅ ASSINATURA DO BACKEND:`);
+      addLog('info', `   ID: ${whoamiData.id}`);
+      addLog('info', `   Version: ${whoamiData.version}`);
+      addLog('info', `   Build Timestamp: ${whoamiData.buildTimestamp}`);
+      addLog('info', `   Server Time: ${whoamiData.at}`);
 
-      // Teste 3: Ping endpoint
+      // Teste 3: Ping com assinatura
       addLog('info', '\n--- TESTE 3: PING ENDPOINT ---');
-      addLog('request', `GET ${baseUrl}/ping`, { 
+      const pingUrl = `${baseUrl}${prefix}/ping`;
+      addLog('request', `GET ${pingUrl}`);
+      
+      const pingResponse = await fetch(pingUrl, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
       });
       
-      const pingResponse = await fetch(`${baseUrl}/ping`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'User-Agent': `RorkApp/${Platform.OS}`,
-        },
-      });
-      
-      addLog('response', `Status: ${pingResponse.status} ${pingResponse.statusText}`, {
+      addLog('response', `Status: ${pingResponse.status}`, {
         headers: Object.fromEntries(pingResponse.headers.entries()),
-        contentType: pingResponse.headers.get('content-type'),
-        cors: {
-          'access-control-allow-origin': pingResponse.headers.get('access-control-allow-origin'),
-          'access-control-allow-methods': pingResponse.headers.get('access-control-allow-methods'),
-          'access-control-allow-headers': pingResponse.headers.get('access-control-allow-headers'),
-        }
       });
       
-      const pingText = await pingResponse.text();
-      addLog('info', `Resposta raw (${pingText.length} bytes): ${pingText}`);
+      const pingData = await pingResponse.json();
+      addLog('success', `✅ Ping OK: ${JSON.stringify(pingData)}`);
+
+      // Teste 4: Health endpoint
+      addLog('info', '\n--- TESTE 4: HEALTH ENDPOINT ---');
+      const healthUrl = `${baseUrl}${prefix}/health`;
+      addLog('request', `GET ${healthUrl}`);
       
-      let pingData;
-      try {
-        pingData = JSON.parse(pingText);
-        addLog('success', 'JSON parseado com sucesso', pingData);
-      } catch (parseError: any) {
-        addLog('error', `Falha ao parsear JSON: ${parseError.message}`);
-        setBackendStatus('❌ Backend retornou resposta inválida');
-        setLastError(`Response não é JSON: ${pingText.substring(0, 100)}`);
-        return;
-      }
-      
-      if (!pingResponse.ok) {
-        addLog('error', `HTTP Error ${pingResponse.status}`);
-        setBackendStatus(`❌ Backend HTTP ${pingResponse.status}`);
-        setLastError(`HTTP ${pingResponse.status}: ${pingText.substring(0, 200)}`);
-        return;
-      }
-      
-      if (!pingData.ok) {
-        addLog('error', 'Ping retornou ok: false');
-        setBackendStatus('❌ Backend ping failed');
-        setLastError('Backend ping retornou ok: false');
-        return;
-      }
-      
-      addLog('success', '✅ Ping endpoint OK');
-      setBackendStatus('✅ Ping OK - Testando tRPC...');
-      setLastResult(`Ping: ${JSON.stringify(pingData)}`);
-      
-      // Teste 4: tRPC endpoint direto (raw fetch)
-      addLog('info', '\n--- TESTE 4: tRPC ENDPOINT (RAW FETCH) ---');
-      const trpcUrl = `${baseUrl}/trpc/users.ensureSeeds`;
-      addLog('request', `POST ${trpcUrl}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' }
+      const healthResponse = await fetch(healthUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
       });
       
-      try {
-        const trpcRawResponse = await fetch(trpcUrl, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({}),
-        });
-        
-        addLog('response', `tRPC Raw Status: ${trpcRawResponse.status}`, {
-          headers: Object.fromEntries(trpcRawResponse.headers.entries()),
-          cors: {
-            'access-control-allow-origin': trpcRawResponse.headers.get('access-control-allow-origin'),
-            'access-control-allow-methods': trpcRawResponse.headers.get('access-control-allow-methods'),
-            'access-control-allow-headers': trpcRawResponse.headers.get('access-control-allow-headers'),
-          }
-        });
-        
-        const trpcRawText = await trpcRawResponse.text();
-        addLog('info', `tRPC Raw Response (${trpcRawText.length} bytes): ${trpcRawText.substring(0, 200)}`);
-        
-        if (trpcRawResponse.ok) {
-          addLog('success', '✅ tRPC endpoint accessible via raw fetch');
-        } else {
-          addLog('error', `❌ tRPC endpoint returned ${trpcRawResponse.status}`);
-        }
-      } catch (err: any) {
-        addLog('error', `tRPC Raw fetch failed: ${err.message}`, err);
-      }
-      
-      // Teste 5: tRPC ensureSeeds via tRPC client
-      addLog('info', '\n--- TESTE 5: tRPC ensureSeeds (via tRPC Client) ---');
-      addLog('request', `POST ${baseUrl}/trpc/users.ensureSeeds`, {
-        method: 'POST',
-        transformer: 'superjson'
+      addLog('response', `Status: ${healthResponse.status}`, {
+        headers: Object.fromEntries(healthResponse.headers.entries()),
       });
+      
+      const healthData = await healthResponse.json();
+      addLog('success', `✅ Health OK: ${JSON.stringify(healthData)}`);
+
+      // Teste 5: tRPC URL final
+      addLog('info', '\n--- TESTE 5: tRPC CONFIGURATION ---');
+      const finalTrpcUrl = getTrpcUrl();
+      addLog('info', `URL FINAL DO tRPC: ${finalTrpcUrl}`);
+      addLog('info', `Montagem: \${baseUrl}\${prefix}/trpc`);
+      addLog('info', `Resultado: ${finalTrpcUrl}`);
+      
+      // Teste 6: tRPC ensureSeeds
+      addLog('info', '\n--- TESTE 6: tRPC ensureSeeds ---');
+      addLog('request', `POST ${finalTrpcUrl}/users.ensureSeeds`);
       
       const seedResult = await ensureSeedsMutation.mutateAsync();
       addLog('response', 'Seeds result recebido', seedResult);
       addLog('success', '✅ tRPC ensureSeeds OK');
-      
-      // Teste 6: Verificar todas as rotas tRPC disponíveis
-      addLog('info', '\n--- TESTE 6: ROTAS tRPC DISPONÍVEIS ---');
-      addLog('info', 'users.login - POST /trpc/users.login');
-      addLog('info', 'users.register - POST /trpc/users.register');
-      addLog('info', 'users.getMe - GET /trpc/users.getMe');
-      addLog('info', 'users.updateMe - POST /trpc/users.updateMe');
-      addLog('info', 'users.ensureSeeds - POST /trpc/users.ensureSeeds');
-      addLog('info', 'users.listEmployees - GET /trpc/users.listEmployees');
-      addLog('info', 'users.createEmployee - POST /trpc/users.createEmployee');
-      addLog('info', 'users.updateEmployee - POST /trpc/users.updateEmployee');
-      addLog('info', 'users.removeEmployee - POST /trpc/users.removeEmployee');
-      addLog('info', 'machines.list - GET /trpc/machines.list');
-      addLog('info', 'machines.create - POST /trpc/machines.create');
-      addLog('info', 'machines.update - POST /trpc/machines.update');
-      addLog('info', 'machines.remove - POST /trpc/machines.remove');
-      addLog('info', 'parts.list - GET /trpc/parts.list');
-      addLog('info', 'parts.create - POST /trpc/parts.create');
-      addLog('info', 'parts.update - POST /trpc/parts.update');
-      addLog('info', 'parts.remove - POST /trpc/parts.remove');
-      addLog('info', 'tickets.listByArea - GET /trpc/tickets.listByArea');
-      addLog('info', 'tickets.listMine - GET /trpc/tickets.listMine');
-      addLog('info', 'tickets.create - POST /trpc/tickets.create');
-      addLog('info', 'tickets.assign - POST /trpc/tickets.assign');
-      addLog('info', 'tickets.updateStatus - POST /trpc/tickets.updateStatus');
-      addLog('info', 'messages.listByConversation - GET /trpc/messages.listByConversation');
-      addLog('info', 'messages.send - POST /trpc/messages.send');
-      addLog('info', 'conversations.listMine - GET /trpc/conversations.listMine');
-      addLog('info', 'conversations.createForTicket - POST /trpc/conversations.createForTicket');
-      addLog('info', 'conversations.archiveForUser - POST /trpc/conversations.archiveForUser');
-      addLog('info', 'rentalOffers.list - GET /trpc/rentalOffers.list');
-      addLog('info', 'rentalOffers.create - POST /trpc/rentalOffers.create');
-      addLog('info', 'rentalOffers.update - POST /trpc/rentalOffers.update');
-      addLog('info', 'rentalOffers.remove - POST /trpc/rentalOffers.remove');
       
       setBackendStatus('✅ Backend Online & tRPC OK');
       setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
@@ -374,6 +292,26 @@ export default function DebugAuthScreen() {
         <Text style={styles.sectionTitle}>Status do Backend</Text>
         <Text style={styles.infoText}>{backendStatus}</Text>
         <Text style={styles.infoText}>Base URL: {process.env.EXPO_PUBLIC_RORK_API_BASE_URL}</Text>
+        {detectedPrefix !== null && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightTitle}>🎯 PREFIXO DETECTADO:</Text>
+            <Text style={styles.highlightValue}>&quot;{detectedPrefix}&quot;</Text>
+          </View>
+        )}
+        {backendSignature && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightTitle}>🔐 ASSINATURA DO BACKEND:</Text>
+            <Text style={styles.highlightDetail}>ID: {backendSignature.id}</Text>
+            <Text style={styles.highlightDetail}>Version: {backendSignature.version}</Text>
+            <Text style={styles.highlightDetail}>Build: {backendSignature.buildTimestamp}</Text>
+          </View>
+        )}
+        {detectedPrefix !== null && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightTitle}>🔗 URL FINAL DO tRPC:</Text>
+            <Text style={styles.highlightValue}>{getTrpcUrl()}</Text>
+          </View>
+        )}
         <Pressable style={styles.smallButton} onPress={() => {
           hasCheckedRef.current = false;
           checkBackend(true);
@@ -688,5 +626,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10b981',
     fontWeight: '600' as const,
+  },
+  highlightBox: {
+    backgroundColor: '#2a2a2a',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+    padding: 12,
+    marginTop: 12,
+    borderRadius: 8,
+  },
+  highlightTitle: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#fff',
+    marginBottom: 6,
+  },
+  highlightValue: {
+    fontSize: 14,
+    fontFamily: 'monospace' as const,
+    color: '#10b981',
+    fontWeight: '600' as const,
+  },
+  highlightDetail: {
+    fontSize: 12,
+    fontFamily: 'monospace' as const,
+    color: '#ddd',
+    marginTop: 2,
   },
 });

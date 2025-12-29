@@ -7,6 +7,10 @@ import { read, write } from './data/store';
 import { User } from './data/schemas';
 import { nanoid } from 'nanoid';
 
+const BACKEND_ID = 'indi-backend-hono';
+const BACKEND_VERSION = '1.0.0';
+const BUILD_TIMESTAMP = Date.now();
+
 const app = new Hono();
 
 async function initializeData() {
@@ -102,18 +106,67 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposeHeaders: ['Content-Length', 'Content-Type'],
   maxAge: 86400,
-  credentials: true,
+  credentials: false,
 }));
 
 app.options('*', (c) => {
   return c.body(null, 204);
 });
 
-app.get('/ping', (c) => c.json({ ok: true, at: new Date().toISOString() }));
-app.get('/', (c) => c.text('API OK'));
+app.get('/__whoami', (c) => c.json({ 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION, 
+  buildTimestamp: BUILD_TIMESTAMP,
+  at: new Date().toISOString()
+}));
+
+app.get('/ping', (c) => c.json({ 
+  ok: true, 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION,
+  at: new Date().toISOString() 
+}));
+
+app.get('/health', (c) => c.json({ 
+  ok: true, 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION,
+  at: new Date().toISOString() 
+}));
+
+app.get('/api/__whoami', (c) => c.json({ 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION, 
+  buildTimestamp: BUILD_TIMESTAMP,
+  at: new Date().toISOString()
+}));
+
+app.get('/api/ping', (c) => c.json({ 
+  ok: true, 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION,
+  at: new Date().toISOString() 
+}));
+
+app.get('/api/health', (c) => c.json({ 
+  ok: true, 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION,
+  at: new Date().toISOString() 
+}));
+
+app.get('/', (c) => c.json({ message: 'Hello World1' }));
 
 app.use(
   '/trpc/*',
+  trpcServer({
+    router: appRouter,
+    createContext,
+  })
+);
+
+app.use(
+  '/api/trpc/*',
   trpcServer({
     router: appRouter,
     createContext,
