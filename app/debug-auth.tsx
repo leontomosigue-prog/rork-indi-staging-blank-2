@@ -112,7 +112,7 @@ export default function DebugAuthScreen() {
 
       // Teste 1: Detecção automática de prefixo
       addLog('info', '\n--- TESTE 1: DETECÇÃO AUTOMÁTICA DE PREFIXO ---');
-      addLog('info', 'Testando prefixos: ["", "/api"]');
+      addLog('info', 'Testando prefixo: ["/api"] (backend publicado SOMENTE em /api)');
       
       let prefix: string;
       try {

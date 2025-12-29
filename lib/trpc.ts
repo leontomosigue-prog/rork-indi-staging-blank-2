@@ -39,7 +39,7 @@ export async function resolveApiPrefix(baseUrl: string): Promise<string> {
 
   console.log('🔍 Resolving API prefix for:', baseUrl);
 
-  const prefixes = ['', '/api'];
+  const prefixes = ['/api'];
 
   for (const prefix of prefixes) {
     const whoamiUrl = `${baseUrl}${prefix}/__whoami`;
@@ -85,7 +85,7 @@ export async function resolveApiPrefix(baseUrl: string): Promise<string> {
 
   const error = new Error(
     `Backend inválido ou URL errada. ` +
-    `Nenhum dos prefixos testados ['', '/api'] retornou assinatura válida (id: ${EXPECTED_BACKEND_ID}). ` +
+    `O backend não responde em ${baseUrl}/api/__whoami com assinatura válida (id: ${EXPECTED_BACKEND_ID}). ` +
     `Verifique se EXPO_PUBLIC_RORK_API_BASE_URL está correto: ${baseUrl}`
   );
   cacheError = error;
@@ -111,8 +111,8 @@ export async function ensurePrefixResolved() {
 export function getTrpcUrl(): string {
   const baseUrl = getBaseUrl();
   if (cachedPrefix === null) {
-    console.warn('⚠️ API prefix not resolved yet, using empty prefix as fallback');
-    return `${baseUrl}/trpc`;
+    console.warn('⚠️ API prefix not resolved yet, using /api as fallback');
+    return `${baseUrl}/api/trpc`;
   }
   return `${baseUrl}${cachedPrefix}/trpc`;
 }
