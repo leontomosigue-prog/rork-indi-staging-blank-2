@@ -122,15 +122,97 @@ export const trpcClient = trpc.createClient({
     httpLink({
       url: getTrpcUrl(),
       transformer: superjson,
-      fetch(url, options) {
-        console.log('🔵 tRPC Fetch:', url);
-        return fetch(url, options).then(res => {
-          console.log('🔵 tRPC Response:', res.status, res.statusText);
-          return res;
-        }).catch(err => {
-          console.error('🔴 tRPC Fetch Error:', err);
+      async fetch(url, options) {
+        const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || __DEV__;
+        const startTime = Date.now();
+        const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        
+        if (shouldLog) {
+          console.log('═══════════════════════════════════════');
+          console.log('🔵 tRPC REQUEST');
+          console.log('═══════════════════════════════════════');
+          console.log('Request ID:', requestId);
+          console.log('Timestamp:', new Date().toISOString());
+          console.log('Method:', options?.method || 'GET');
+          console.log('URL:', url);
+          console.log('Headers:', JSON.stringify(options?.headers || {}, null, 2));
+          
+          if (options?.body) {
+            const bodyStr = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+            const truncated = bodyStr.length > 2000 ? bodyStr.substring(0, 2000) + '... [TRUNCATED]' : bodyStr;
+            console.log('Body (', bodyStr.length, 'chars):', truncated);
+            
+            try {
+              const parsed = JSON.parse(bodyStr);
+              if (parsed.password) {
+                console.log('⚠️ Password detected in body (redacted in production)');
+              }
+            } catch {
+              // not JSON, ignore
+            }
+          }
+        }
+        
+        const enhancedOptions = {
+          ...options,
+          headers: {
+            ...options?.headers,
+            ...(shouldLog ? { 'x-debug-request-id': requestId } : {}),
+          },
+        };
+        
+        try {
+          const response = await fetch(url, enhancedOptions);
+          const durationMs = Date.now() - startTime;
+          
+          if (shouldLog) {
+            console.log('═══════════════════════════════════════');
+            console.log('🟢 tRPC RESPONSE');
+            console.log('═══════════════════════════════════════');
+            console.log('Request ID:', requestId);
+            console.log('Duration:', durationMs, 'ms');
+            console.log('Status:', response.status, response.statusText);
+            console.log('Content-Type:', response.headers.get('content-type'));
+            console.log('Content-Length:', response.headers.get('content-length'));
+            
+            const clonedResponse = response.clone();
+            const bodyText = await clonedResponse.text();
+            const truncated = bodyText.length > 2000 ? bodyText.substring(0, 2000) + '... [TRUNCATED]' : bodyText;
+            console.log('Body (', bodyText.length, 'chars):', truncated);
+            
+            if (!response.headers.get('content-type')?.includes('application/json')) {
+              console.error('⚠️ Response is NOT JSON! Content-Type:', response.headers.get('content-type'));
+              console.error('Body:', truncated);
+            }
+            
+            const urlParts = url.toString().split('/trpc/');
+            if (urlParts.length > 1) {
+              const procedurePath = urlParts[1];
+              console.log('tRPC Procedure Path:', procedurePath);
+              
+              if (procedurePath.startsWith('trpc/')) {
+                console.error('🚨 DOUBLE /trpc/ DETECTED! URL contains /trpc/trpc/');
+                console.error('Full URL:', url);
+              }
+            }
+          }
+          
+          return response;
+        } catch (err: any) {
+          const durationMs = Date.now() - startTime;
+          
+          if (shouldLog) {
+            console.log('═══════════════════════════════════════');
+            console.error('🔴 tRPC FETCH ERROR');
+            console.log('═══════════════════════════════════════');
+            console.error('Request ID:', requestId);
+            console.error('Duration:', durationMs, 'ms');
+            console.error('Error:', err.name, err.message);
+            console.error('Stack:', err.stack);
+          }
+          
           throw err;
-        });
+        }
       },
     }),
   ],

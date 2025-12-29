@@ -13,6 +13,14 @@ const BUILD_TIMESTAMP = Date.now();
 
 const app = new Hono();
 
+console.log('🚀 BACKEND STARTING');
+console.log('   ID:', BACKEND_ID);
+console.log('   Version:', BACKEND_VERSION);
+console.log('   Build Timestamp:', BUILD_TIMESTAMP);
+console.log('   tRPC will be mounted at:');
+console.log('     - /trpc/*');
+console.log('     - /api/trpc/*');
+
 async function initializeData() {
   console.log('🔧 Initializing backend data...');
   
@@ -103,11 +111,54 @@ initializeData().catch(error => {
 app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposeHeaders: ['Content-Length', 'Content-Type'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'x-debug-trace-id', 'x-debug-request-id'],
+  exposeHeaders: ['Content-Length', 'Content-Type', 'x-debug-trace-id', 'x-debug-request-id'],
   maxAge: 86400,
   credentials: false,
 }));
+
+app.use('/api/trpc/*', async (c, next) => {
+  const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || process.env.NODE_ENV === 'development';
+  
+  if (shouldLog) {
+    const startTime = Date.now();
+    const traceId = c.req.header('x-debug-trace-id');
+    const requestId = c.req.header('x-debug-request-id');
+    
+    console.log('═══════════════════════════════════════');
+    console.log('📥 BACKEND tRPC REQUEST');
+    console.log('═══════════════════════════════════════');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Trace ID:', traceId || 'none');
+    console.log('Request ID:', requestId || 'none');
+    console.log('Method:', c.req.method);
+    console.log('Path:', c.req.path);
+    console.log('Query:', JSON.stringify(c.req.query()));
+    console.log('Content-Type:', c.req.header('content-type'));
+    console.log('User-Agent:', c.req.header('user-agent'));
+    
+    await next();
+    
+    const durationMs = Date.now() - startTime;
+    
+    console.log('═══════════════════════════════════════');
+    console.log('📤 BACKEND tRPC RESPONSE');
+    console.log('═══════════════════════════════════════');
+    console.log('Trace ID:', traceId || 'none');
+    console.log('Request ID:', requestId || 'none');
+    console.log('Duration:', durationMs, 'ms');
+    console.log('Status:', c.res.status);
+    
+    if (traceId) {
+      c.header('x-debug-trace-id', traceId);
+    }
+    if (requestId) {
+      c.header('x-debug-request-id', requestId);
+    }
+  } else {
+    await next();
+  }
+});
 
 app.options('*', (c) => {
   return c.body(null, 204);

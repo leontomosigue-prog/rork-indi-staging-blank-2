@@ -23,6 +23,25 @@ interface LogEntry {
   details?: any;
 }
 
+interface DetailedRequest {
+  traceId: string;
+  testName: string;
+  timestamp: string;
+  method: string;
+  url: string;
+  headers?: Record<string, string>;
+  requestBody?: string;
+  durationMs?: number;
+  responseStatus?: number;
+  responseHeaders?: Record<string, string>;
+  responseBodyRaw?: string;
+  parseResult?: string;
+  trpcUrlBase?: string;
+  procedure?: string;
+  batch?: boolean;
+  payloadShape?: string[];
+}
+
 export default function DebugAuthScreen() {
   const insets = useSafeAreaInsets();
   const { user, login } = useAuth();
@@ -34,7 +53,12 @@ export default function DebugAuthScreen() {
   const [detectedPrefix, setDetectedPrefix] = useState<string | null>(null);
   const [backendSignature, setBackendSignature] = useState<any>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [detailedRequests, setDetailedRequests] = useState<DetailedRequest[]>([]);
   const [copyFeedback, setCopyFeedback] = useState('');
+  const [traceId, setTraceId] = useState<string>('');
+  const [lastRequestUrl, setLastRequestUrl] = useState<string>('');
+  const [lastStatusCode, setLastStatusCode] = useState<number | null>(null);
+  const [lastErrorFull, setLastErrorFull] = useState<string>('');
   const hasCheckedRef = useRef(false);
   
   const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
@@ -43,23 +67,133 @@ export default function DebugAuthScreen() {
   const addLog = useCallback((type: LogEntry['type'], message: string, details?: any) => {
     const timestamp = new Date().toISOString();
     const logEntry: LogEntry = { timestamp, type, message, details };
-    console.log(`[${type.toUpperCase()}] ${message}`, details || '');
+    if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+      console.log(`[${type.toUpperCase()}] ${message}`, details || '');
+    }
     setLogs(prev => [...prev, logEntry]);
+  }, []);
+
+  const addDetailedRequest = useCallback((request: DetailedRequest) => {
+    if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+      console.log('📋 DETAILED REQUEST:', request);
+    }
+    setDetailedRequests(prev => [...prev, request]);
+    setLastRequestUrl(request.url);
+    if (request.responseStatus) {
+      setLastStatusCode(request.responseStatus);
+    }
+  }, []);
+
+  const redactSensitiveData = useCallback((data: any): any => {
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        return JSON.stringify(redactSensitiveData(parsed));
+      } catch {
+        return data;
+      }
+    }
+    if (typeof data === 'object' && data !== null) {
+      const redacted = { ...data };
+      if ('password' in redacted) {
+        redacted.password = '***';
+      }
+      return redacted;
+    }
+    return data;
   }, []);
 
   const clearLogs = useCallback(() => {
     setLogs([]);
+    setDetailedRequests([]);
     addLog('info', 'Logs limpos');
   }, [addLog]);
 
   const copyLogs = useCallback(async () => {
     try {
-      let logText = '=== LOGS DE DEBUG - FRONTEND/BACKEND ===\n\n';
+      let logText = '═══════════════════════════════════════════════════════\n';
+      logText += '     LOGS FORENSES - FRONTEND ↔ BACKEND\n';
+      logText += '═══════════════════════════════════════════════════════\n\n';
+      
+      logText += '🧷 RESUMO\n';
+      logText += '─'.repeat(50) + '\n';
+      logText += `Trace ID: ${traceId}\n`;
       logText += `Platform: ${Platform.OS}\n`;
       logText += `Base URL: ${process.env.EXPO_PUBLIC_RORK_API_BASE_URL}\n`;
+      logText += `Prefixo Detectado: "${detectedPrefix || 'não resolvido'}"\n`;
+      logText += `tRPC URL Final: ${getTrpcUrl()}\n`;
+      logText += `Última URL Chamada: ${lastRequestUrl || 'nenhuma'}\n`;
+      logText += `Último Status Code: ${lastStatusCode !== null ? lastStatusCode : 'N/A'}\n`;
+      logText += `Último Erro: ${lastErrorFull || 'nenhum'}\n`;
       logText += `Ambiente: ${process.env.NODE_ENV || 'development'}\n`;
-      logText += `Timestamp: ${new Date().toISOString()}\n`;
-      logText += '\n' + '='.repeat(50) + '\n\n';
+      logText += `Timestamp Geração: ${new Date().toISOString()}\n`;
+      logText += '\n' + '═'.repeat(50) + '\n\n';
+      
+      logText += '📋 REQUESTS DETALHADOS\n';
+      logText += '─'.repeat(50) + '\n\n';
+      
+      detailedRequests.forEach((req, index) => {
+        logText += `[REQUEST #${index + 1}]\n`;
+        logText += `├─ Trace ID: ${req.traceId}\n`;
+        logText += `├─ Test Name: ${req.testName}\n`;
+        logText += `├─ Timestamp: ${req.timestamp}\n`;
+        logText += `├─ Method: ${req.method}\n`;
+        logText += `├─ URL: ${req.url}\n`;
+        
+        if (req.headers) {
+          logText += `├─ Request Headers:\n`;
+          Object.entries(req.headers).forEach(([k, v]) => {
+            logText += `│  • ${k}: ${k.toLowerCase().includes('authorization') ? '[REDACTED]' : v}\n`;
+          });
+        }
+        
+        if (req.requestBody) {
+          const truncated = req.requestBody.length > 2000 ? req.requestBody.substring(0, 2000) + '... [TRUNCATED]' : req.requestBody;
+          logText += `├─ Request Body (${req.requestBody.length} chars):\n${truncated}\n`;
+        }
+        
+        if (req.trpcUrlBase) {
+          logText += `├─ tRPC Base URL: ${req.trpcUrlBase}\n`;
+        }
+        if (req.procedure) {
+          logText += `├─ Procedure: ${req.procedure}\n`;
+        }
+        if (req.batch !== undefined) {
+          logText += `├─ Batch: ${req.batch}\n`;
+        }
+        if (req.payloadShape) {
+          logText += `├─ Payload Shape: [${req.payloadShape.join(', ')}]\n`;
+        }
+        
+        if (req.durationMs !== undefined) {
+          logText += `├─ Duration: ${req.durationMs}ms\n`;
+        }
+        
+        if (req.responseStatus !== undefined) {
+          logText += `├─ Response Status: ${req.responseStatus}\n`;
+        }
+        
+        if (req.responseHeaders) {
+          logText += `├─ Response Headers:\n`;
+          Object.entries(req.responseHeaders).forEach(([k, v]) => {
+            logText += `│  • ${k}: ${v}\n`;
+          });
+        }
+        
+        if (req.responseBodyRaw) {
+          const truncated = req.responseBodyRaw.length > 2000 ? req.responseBodyRaw.substring(0, 2000) + '... [TRUNCATED]' : req.responseBodyRaw;
+          logText += `├─ Response Body (${req.responseBodyRaw.length} chars):\n${truncated}\n`;
+        }
+        
+        if (req.parseResult) {
+          logText += `└─ Parse Result: ${req.parseResult}\n`;
+        }
+        
+        logText += '\n' + '─'.repeat(50) + '\n\n';
+      });
+      
+      logText += '\n📝 LOGS SIMPLES\n';
+      logText += '─'.repeat(50) + '\n\n';
       
       logs.forEach((log, index) => {
         logText += `[${index + 1}] [${log.type.toUpperCase()}] ${log.timestamp}\n`;
@@ -77,7 +211,7 @@ export default function DebugAuthScreen() {
       setCopyFeedback('❌ Erro ao copiar');
       setTimeout(() => setCopyFeedback(''), 2000);
     }
-  }, [logs]);
+  }, [logs, detailedRequests, traceId, detectedPrefix, lastRequestUrl, lastStatusCode, lastErrorFull]);
 
   const checkBackend = useCallback(async (force = false) => {
     if (!force && hasCheckedRef.current) {
@@ -86,9 +220,14 @@ export default function DebugAuthScreen() {
     }
     
     hasCheckedRef.current = true;
+    const newTraceId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setTraceId(newTraceId);
     setBackendStatus('🔄 Verificando...');
     setLastError('');
     setLastResult('');
+    setLastErrorFull('');
+    setLastRequestUrl('');
+    setLastStatusCode(null);
     setDetectedPrefix(null);
     setBackendSignature(null);
     
@@ -110,7 +249,6 @@ export default function DebugAuthScreen() {
         throw new Error('EXPO_PUBLIC_RORK_API_BASE_URL não está configurado');
       }
 
-      // Teste 1: Detecção automática de prefixo
       addLog('info', '\n--- TESTE 1: DETECÇÃO AUTOMÁTICA DE PREFIXO ---');
       addLog('info', 'Testando prefixo: ["/api"] (backend publicado SOMENTE em /api)');
       
@@ -126,22 +264,47 @@ export default function DebugAuthScreen() {
         return;
       }
 
-      // Teste 2: Validar assinatura do backend
       addLog('info', '\n--- TESTE 2: VALIDAÇÃO DE ASSINATURA ---');
       const whoamiUrl = `${baseUrl}${prefix}/__whoami`;
       addLog('request', `GET ${whoamiUrl}`);
       
+      const startWhoami = Date.now();
       const whoamiResponse = await fetch(whoamiUrl, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        headers: { 
+          'Accept': 'application/json',
+          ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
+        },
       });
+      const durationWhoami = Date.now() - startWhoami;
       
+      const whoamiHeaders = Object.fromEntries(whoamiResponse.headers.entries());
       addLog('response', `Status: ${whoamiResponse.status}`, {
-        headers: Object.fromEntries(whoamiResponse.headers.entries()),
+        headers: whoamiHeaders,
       });
       
-      const whoamiData = await whoamiResponse.json();
+      const whoamiBodyRaw = await whoamiResponse.text();
+      const whoamiData = JSON.parse(whoamiBodyRaw);
       setBackendSignature(whoamiData);
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId: newTraceId,
+          testName: 'Validação de Assinatura',
+          timestamp: new Date().toISOString(),
+          method: 'GET',
+          url: whoamiUrl,
+          headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
+          durationMs: durationWhoami,
+          responseStatus: whoamiResponse.status,
+          responseHeaders: {
+            'content-type': whoamiHeaders['content-type'] || '',
+            'content-length': whoamiHeaders['content-length'] || '',
+          },
+          responseBodyRaw: whoamiBodyRaw,
+          parseResult: 'JSON parsed successfully',
+        });
+      }
       
       addLog('success', `✅ ASSINATURA DO BACKEND:`);
       addLog('info', `   ID: ${whoamiData.id}`);
@@ -149,50 +312,113 @@ export default function DebugAuthScreen() {
       addLog('info', `   Build Timestamp: ${whoamiData.buildTimestamp}`);
       addLog('info', `   Server Time: ${whoamiData.at}`);
 
-      // Teste 3: Ping com assinatura
       addLog('info', '\n--- TESTE 3: PING ENDPOINT ---');
       const pingUrl = `${baseUrl}${prefix}/ping`;
       addLog('request', `GET ${pingUrl}`);
       
+      const startPing = Date.now();
       const pingResponse = await fetch(pingUrl, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        headers: { 
+          'Accept': 'application/json',
+          ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
+        },
       });
+      const durationPing = Date.now() - startPing;
       
+      const pingHeaders = Object.fromEntries(pingResponse.headers.entries());
       addLog('response', `Status: ${pingResponse.status}`, {
-        headers: Object.fromEntries(pingResponse.headers.entries()),
+        headers: pingHeaders,
       });
       
-      const pingData = await pingResponse.json();
+      const pingBodyRaw = await pingResponse.text();
+      const pingData = JSON.parse(pingBodyRaw);
       addLog('success', `✅ Ping OK: ${JSON.stringify(pingData)}`);
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId: newTraceId,
+          testName: 'Ping Endpoint',
+          timestamp: new Date().toISOString(),
+          method: 'GET',
+          url: pingUrl,
+          headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
+          durationMs: durationPing,
+          responseStatus: pingResponse.status,
+          responseHeaders: {
+            'content-type': pingHeaders['content-type'] || '',
+            'content-length': pingHeaders['content-length'] || '',
+          },
+          responseBodyRaw: pingBodyRaw,
+          parseResult: 'JSON parsed successfully',
+        });
+      }
 
-      // Teste 4: Health endpoint
       addLog('info', '\n--- TESTE 4: HEALTH ENDPOINT ---');
       const healthUrl = `${baseUrl}${prefix}/health`;
       addLog('request', `GET ${healthUrl}`);
       
+      const startHealth = Date.now();
       const healthResponse = await fetch(healthUrl, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        headers: { 
+          'Accept': 'application/json',
+          ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
+        },
       });
+      const durationHealth = Date.now() - startHealth;
       
+      const healthHeaders = Object.fromEntries(healthResponse.headers.entries());
       addLog('response', `Status: ${healthResponse.status}`, {
-        headers: Object.fromEntries(healthResponse.headers.entries()),
+        headers: healthHeaders,
       });
       
-      const healthData = await healthResponse.json();
+      const healthBodyRaw = await healthResponse.text();
+      const healthData = JSON.parse(healthBodyRaw);
       addLog('success', `✅ Health OK: ${JSON.stringify(healthData)}`);
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId: newTraceId,
+          testName: 'Health Endpoint',
+          timestamp: new Date().toISOString(),
+          method: 'GET',
+          url: healthUrl,
+          headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
+          durationMs: durationHealth,
+          responseStatus: healthResponse.status,
+          responseHeaders: {
+            'content-type': healthHeaders['content-type'] || '',
+            'content-length': healthHeaders['content-length'] || '',
+          },
+          responseBodyRaw: healthBodyRaw,
+          parseResult: 'JSON parsed successfully',
+        });
+      }
 
-      // Teste 5: tRPC URL final
       addLog('info', '\n--- TESTE 5: tRPC CONFIGURATION ---');
       const finalTrpcUrl = getTrpcUrl();
       addLog('info', `URL FINAL DO tRPC: ${finalTrpcUrl}`);
       addLog('info', `Montagem: \${baseUrl}\${prefix}/trpc`);
       addLog('info', `Resultado: ${finalTrpcUrl}`);
       
-      // Teste 6: tRPC ensureSeeds
       addLog('info', '\n--- TESTE 6: tRPC ensureSeeds ---');
-      addLog('request', `POST ${finalTrpcUrl}/users.ensureSeeds`);
+      const ensureSeedsUrl = `${finalTrpcUrl}/users.ensureSeeds`;
+      addLog('request', `POST ${ensureSeedsUrl}`);
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId: newTraceId,
+          testName: 'tRPC ensureSeeds',
+          timestamp: new Date().toISOString(),
+          method: 'POST',
+          url: ensureSeedsUrl,
+          trpcUrlBase: finalTrpcUrl,
+          procedure: 'users.ensureSeeds',
+          batch: false,
+          payloadShape: [],
+        });
+      }
       
       const seedResult = await ensureSeedsMutation.mutateAsync();
       addLog('response', 'Seeds result recebido', seedResult);
@@ -202,6 +428,9 @@ export default function DebugAuthScreen() {
       setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
       addLog('success', '\n✅ TODAS AS VERIFICAÇÕES CONCLUÍDAS COM SUCESSO');
     } catch (error: any) {
+      const fullError = `${error?.name || 'Error'}: ${error?.message || String(error)}\nStack: ${error?.stack || 'N/A'}`;
+      setLastErrorFull(fullError);
+      
       addLog('error', `Erro fatal: ${error?.name || 'Error'}: ${error?.message || String(error)}`, {
         stack: error?.stack,
         cause: error?.cause,
@@ -210,7 +439,7 @@ export default function DebugAuthScreen() {
       setBackendStatus('❌ Backend Error');
       setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
     }
-  }, [ensureSeedsMutation, addLog]);
+  }, [ensureSeedsMutation, addLog, addDetailedRequest]);
 
   useEffect(() => {
     checkBackend();
@@ -221,11 +450,28 @@ export default function DebugAuthScreen() {
     addLog('info', '\n--- TESTE DE LOGIN ADMIN ---');
     setLastError('');
     setLastResult('');
+    setLastErrorFull('');
     setIsLoadingAdmin(true);
     
     try {
       const credentials = { email: 'admin@indi.com', password: 'admin123' };
-      addLog('request', 'Chamando tRPC login mutation', credentials);
+      const redactedCreds = redactSensitiveData(credentials);
+      addLog('request', 'Chamando tRPC login mutation', redactedCreds);
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId,
+          testName: 'Login Admin',
+          timestamp: new Date().toISOString(),
+          method: 'POST',
+          url: `${getTrpcUrl()}/users.login`,
+          trpcUrlBase: getTrpcUrl(),
+          procedure: 'users.login',
+          batch: false,
+          payloadShape: Object.keys(credentials),
+          requestBody: JSON.stringify(redactedCreds),
+        });
+      }
       
       const directResult = await loginMutation.mutateAsync(credentials);
       addLog('response', 'Resultado tRPC direto', directResult);
@@ -241,6 +487,9 @@ export default function DebugAuthScreen() {
         addLog('success', 'Navegação executada');
       }
     } catch (error: any) {
+      const fullError = `${error?.name || 'Error'}: ${error?.message || String(error)}\nStack: ${error?.stack || 'N/A'}`;
+      setLastErrorFull(fullError);
+      
       addLog('error', `Erro no login admin: ${error?.message || String(error)}`, {
         name: error?.name,
         stack: error?.stack,
@@ -256,6 +505,7 @@ export default function DebugAuthScreen() {
     addLog('info', '\n--- TESTE DE LOGIN CLIENTE ---');
     setLastError('');
     setLastResult('');
+    setLastErrorFull('');
     setIsLoadingClient(true);
     
     try {
@@ -274,6 +524,9 @@ export default function DebugAuthScreen() {
         addLog('success', 'Navegação executada');
       }
     } catch (error: any) {
+      const fullError = `${error?.name || 'Error'}: ${error?.message || String(error)}\nStack: ${error?.stack || 'N/A'}`;
+      setLastErrorFull(fullError);
+      
       addLog('error', `Erro no login cliente: ${String(error)}`, error);
       setLastError(String(error));
     } finally {
@@ -289,9 +542,19 @@ export default function DebugAuthScreen() {
       <Text style={styles.title}>Debug de Autenticação</Text>
       
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Status do Backend</Text>
-        <Text style={styles.infoText}>{backendStatus}</Text>
-        <Text style={styles.infoText}>Base URL: {process.env.EXPO_PUBLIC_RORK_API_BASE_URL}</Text>
+        <Text style={styles.sectionTitle}>🧷 RESUMO</Text>
+        <View style={styles.highlightBox}>
+          <Text style={styles.highlightTitle}>Status:</Text>
+          <Text style={styles.infoText}>{backendStatus}</Text>
+        </View>
+        <View style={styles.highlightBox}>
+          <Text style={styles.highlightTitle}>Trace ID:</Text>
+          <Text style={styles.highlightValue}>{traceId || 'Aguardando verificação...'}</Text>
+        </View>
+        <View style={styles.highlightBox}>
+          <Text style={styles.highlightTitle}>Base URL:</Text>
+          <Text style={styles.infoText}>{process.env.EXPO_PUBLIC_RORK_API_BASE_URL}</Text>
+        </View>
         {detectedPrefix !== null && (
           <View style={styles.highlightBox}>
             <Text style={styles.highlightTitle}>🎯 PREFIXO DETECTADO:</Text>
@@ -310,6 +573,24 @@ export default function DebugAuthScreen() {
           <View style={styles.highlightBox}>
             <Text style={styles.highlightTitle}>🔗 URL FINAL DO tRPC:</Text>
             <Text style={styles.highlightValue}>{getTrpcUrl()}</Text>
+          </View>
+        )}
+        {lastRequestUrl && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightTitle}>Última URL Chamada:</Text>
+            <Text style={styles.infoText}>{lastRequestUrl}</Text>
+          </View>
+        )}
+        {lastStatusCode !== null && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightTitle}>Último Status Code:</Text>
+            <Text style={styles.infoText}>{lastStatusCode}</Text>
+          </View>
+        )}
+        {lastErrorFull && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightTitle}>Último Erro Completo:</Text>
+            <Text style={[styles.infoText, { fontSize: 10 }]}>{lastErrorFull}</Text>
           </View>
         )}
         <Pressable style={styles.smallButton} onPress={() => {
@@ -393,7 +674,7 @@ export default function DebugAuthScreen() {
               <Text style={styles.copyFeedback}>{copyFeedback}</Text>
             ) : null}
             <Pressable style={styles.copyButton} onPress={copyLogs}>
-              <Text style={styles.copyButtonText}>Copiar Logs</Text>
+              <Text style={styles.copyButtonText}>📋 COPIAR LOG COMPLETO</Text>
             </Pressable>
             <Pressable style={styles.clearButton} onPress={clearLogs}>
               <Text style={styles.clearButtonText}>Limpar</Text>
