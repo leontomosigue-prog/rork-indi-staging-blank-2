@@ -1,248 +1,390 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Announcement, CatalogItem, Conversation, ConversationArea, Message, Priority } from '@/types';
+import { dataGateway, type Conversa, type Mensagem, type Maquina, type Peca, type Area, type Priority } from '@/lib/data-gateway';
 import { useAuth } from './AuthContext';
-
-const STORAGE_KEYS = {
-  CONVERSATIONS: '@indi:conversations',
-  CATALOG: '@indi:catalog',
-  ANNOUNCEMENTS: '@indi:announcements',
-};
-
-const MOCK_CATALOG: CatalogItem[] = [
-  {
-    id: '1',
-    name: 'Empilhadeira Elétrica 2T',
-    description: 'Empilhadeira elétrica com capacidade de 2 toneladas, ideal para armazéns fechados',
-    category: 'Vendas',
-    imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800',
-    specifications: {
-      'Capacidade': '2000 kg',
-      'Altura máxima': '4.5m',
-      'Tipo': 'Elétrica',
-    },
-    price: 85000,
-    available: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Empilhadeira a Gás 3T',
-    description: 'Empilhadeira a gás GLP com capacidade de 3 toneladas',
-    category: 'Locação',
-    imageUrl: 'https://images.unsplash.com/photo-1565082019-fd32c5a67e28?w=800',
-    specifications: {
-      'Capacidade': '3000 kg',
-      'Altura máxima': '5m',
-      'Tipo': 'GLP',
-    },
-    price: 120000,
-    available: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    name: 'Garfo Para Empilhadeira',
-    description: 'Garfo reforçado compatível com diversos modelos',
-    category: 'Peças',
-    specifications: {
-      'Comprimento': '1.2m',
-      'Capacidade': '2500 kg',
-    },
-    price: 1500,
-    available: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const MOCK_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: '1',
-    title: 'Bem-vindo ao Sistema INDI',
-    content: 'Aqui você pode solicitar serviços, acompanhar pedidos e muito mais.',
-    type: 'news',
-    author: 'Sistema',
-    active: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    title: 'Promoção: Empilhadeiras com 10% de desconto',
-    content: 'Aproveite nossa promoção especial em toda linha de empilhadeiras elétricas.',
-    type: 'promotion',
-    author: 'Vendas',
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    active: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+import { useAppState } from './AppStateContext';
+import type { User } from '@/types';
 
 export const [DataProvider, useData] = createContextHook(() => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const { startOperation, endOperation, setError } = useAppState();
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [mensagens, setMensagens] = useState<Record<string, Mensagem[]>>({});
+  const [maquinasVenda, setMaquinasVenda] = useState<Maquina[]>([]);
+  const [maquinasLocacao, setMaquinasLocacao] = useState<Maquina[]>([]);
+  const [pecas, setPecas] = useState<Peca[]>([]);
+  const [colaboradores, setColaboradores] = useState<User[]>([]);
+  const [clientes, setClientes] = useState<User[]>([]);
+
+  const loadConversas = useCallback(async () => {
+    if (!user) return;
+
+    startOperation('loadConversas', 'fetching_data');
+    const response = await dataGateway.listConversasPorUsuario(
+      user.id,
+      user.type,
+      user.roles
+    );
+    
+    if (response.status === 'ok') {
+      setConversas(response.data);
+      endOperation();
+    } else {
+      setError({ ...response, module: 'chat' });
+    }
+  }, [user, startOperation, endOperation, setError]);
+
+  const loadMaquinas = useCallback(async () => {
+    startOperation('loadMaquinas', 'fetching_data');
+    
+    const [vendaResponse, locacaoResponse] = await Promise.all([
+      dataGateway.listMaquinas('venda'),
+      dataGateway.listMaquinas('locacao'),
+    ]);
+
+    if (vendaResponse.status === 'ok' && locacaoResponse.status === 'ok') {
+      setMaquinasVenda(vendaResponse.data);
+      setMaquinasLocacao(locacaoResponse.data);
+      endOperation();
+    } else {
+      setError({
+        errorCode: 'FETCH_FAILED',
+        errorMessage: 'Erro ao carregar máquinas',
+        module: 'catalog',
+      });
+    }
+  }, [startOperation, endOperation, setError]);
+
+  const loadPecas = useCallback(async () => {
+    startOperation('loadPecas', 'fetching_data');
+    const response = await dataGateway.listPecas();
+    
+    if (response.status === 'ok') {
+      setPecas(response.data);
+      endOperation();
+    } else {
+      setError({ ...response, module: 'catalog' });
+    }
+  }, [startOperation, endOperation, setError]);
+
+  const loadColaboradores = useCallback(async () => {
+    if (user?.type !== 'employee' || !user?.roles?.includes('Admin')) return;
+
+    startOperation('loadColaboradores', 'fetching_data');
+    const response = await dataGateway.listColaboradores();
+    
+    if (response.status === 'ok') {
+      setColaboradores(response.data);
+      endOperation();
+    } else {
+      setError({ ...response, module: 'admin' });
+    }
+  }, [user, startOperation, endOperation, setError]);
+
+  const loadClientes = useCallback(async () => {
+    if (user?.type !== 'employee' || !user?.roles?.includes('Admin')) return;
+
+    startOperation('loadClientes', 'fetching_data');
+    const response = await dataGateway.listClientes();
+    
+    if (response.status === 'ok') {
+      setClientes(response.data);
+      endOperation();
+    } else {
+      setError({ ...response, module: 'admin' });
+    }
+  }, [user, startOperation, endOperation, setError]);
 
   useEffect(() => {
-    loadData();
-  }, [user]);
-
-  const loadData = async () => {
-    console.log('DataContext: Loading data...');
-    try {
-      const convString = await AsyncStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
-      const catalogString = await AsyncStorage.getItem(STORAGE_KEYS.CATALOG);
-      const announcementsString = await AsyncStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS);
-
-      if (convString) {
-        setConversations(JSON.parse(convString));
-      }
-
-      if (catalogString) {
-        setCatalog(JSON.parse(catalogString));
-      } else {
-        setCatalog(MOCK_CATALOG);
-        await AsyncStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify(MOCK_CATALOG));
-      }
-
-      if (announcementsString) {
-        setAnnouncements(JSON.parse(announcementsString));
-      } else {
-        setAnnouncements(MOCK_ANNOUNCEMENTS);
-        await AsyncStorage.setItem(STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(MOCK_ANNOUNCEMENTS));
-      }
-      
-      console.log('DataContext: Data loaded successfully');
-    } catch (error) {
-      console.error('DataContext: Load data error:', error);
+    if (user) {
+      loadConversas();
+      loadMaquinas();
+      loadPecas();
+      loadColaboradores();
+      loadClientes();
     }
-  };
+  }, [user, loadConversas, loadMaquinas, loadPecas, loadColaboradores, loadClientes]);
 
-  const createConversation = useCallback(async (area: ConversationArea, title: string, priority?: Priority): Promise<string> => {
-    console.log('DataContext: Creating conversation:', { area, title });
-    if (!user) {
-      console.error('DataContext: No user logged in');
-      return '';
+  const criarConversa = useCallback(async (params: {
+    area: Area;
+    titulo: string;
+    mensagemInicial?: string;
+    prioridade?: Priority;
+  }): Promise<string | null> => {
+    if (!user) return null;
+
+    startOperation('criarConversa', 'sending_data');
+    const response = await dataGateway.criarConversa({
+      userId: user.id,
+      userName: user.fullName,
+      ...params,
+    });
+
+    if (response.status === 'ok') {
+      await loadConversas();
+      endOperation();
+      return response.data;
+    } else {
+      setError({ ...response, module: 'chat' });
+      return null;
+    }
+  }, [user, startOperation, endOperation, setError, loadConversas]);
+
+  const loadMensagens = useCallback(async (conversaId: string): Promise<Mensagem[]> => {
+    if (mensagens[conversaId]) {
+      return mensagens[conversaId];
     }
 
-    try {
-      const newConversation: Conversation = {
-        id: Date.now().toString(),
-        clientId: user.id,
-        clientName: user.fullName,
-        area,
-        title,
-        status: 'open',
-        priority,
-        messages: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+    startOperation(`loadMensagens:${conversaId}`, 'fetching_data');
+    const response = await dataGateway.listMensagens(conversaId);
 
-      const updated = [...conversations, newConversation];
-      setConversations(updated);
-      await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(updated));
-      console.log('DataContext: Conversation created successfully');
-      return newConversation.id;
-    } catch (error) {
-      console.error('DataContext: Create conversation error:', error);
-      return '';
+    if (response.status === 'ok') {
+      setMensagens(prev => ({ ...prev, [conversaId]: response.data }));
+      endOperation();
+      return response.data;
+    } else {
+      setError({ ...response, module: 'chat' });
+      return [];
     }
-  }, [user, conversations]);
+  }, [mensagens, startOperation, endOperation, setError]);
 
-  const sendMessage = useCallback(async (conversationId: string, text: string): Promise<boolean> => {
-    console.log('DataContext: Sending message to conversation:', conversationId);
+  const enviarMensagem = useCallback(async (conversaId: string, texto: string): Promise<boolean> => {
     if (!user) return false;
 
-    try {
-      const conversation = conversations.find(c => c.id === conversationId);
-      if (!conversation) {
-        console.error('DataContext: Conversation not found');
-        return false;
-      }
+    startOperation('enviarMensagem', 'sending_data');
+    const response = await dataGateway.enviarMensagem({
+      conversaId,
+      autorId: user.id,
+      autorNome: user.fullName,
+      texto,
+    });
 
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        conversationId,
-        senderId: user.id,
-        senderName: user.fullName,
-        text,
-        timestamp: new Date().toISOString(),
-        read: false,
-      };
-
-      const updatedConversation = {
-        ...conversation,
-        messages: [...conversation.messages, newMessage],
-        updatedAt: new Date().toISOString(),
-      };
-
-      const updated = conversations.map(c => 
-        c.id === conversationId ? updatedConversation : c
-      );
-
-      setConversations(updated);
-      await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(updated));
-      console.log('DataContext: Message sent successfully');
+    if (response.status === 'ok') {
+      setMensagens(prev => ({
+        ...prev,
+        [conversaId]: [...(prev[conversaId] || []), response.data],
+      }));
+      await loadConversas();
+      endOperation();
       return true;
-    } catch (error) {
-      console.error('DataContext: Send message error:', error);
+    } else {
+      setError({ ...response, module: 'chat' });
       return false;
     }
-  }, [user, conversations]);
+  }, [user, startOperation, endOperation, setError, loadConversas]);
 
-  const resolveConversation = useCallback(async (conversationId: string): Promise<boolean> => {
-    console.log('DataContext: Resolving conversation:', conversationId);
-    try {
-      const updated = conversations.map(c => 
-        c.id === conversationId 
-          ? { ...c, status: 'resolved' as const, resolvedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-          : c
-      );
+  const marcarConversaComoResolvida = useCallback(async (conversaId: string): Promise<boolean> => {
+    startOperation('marcarConversaComoResolvida', 'processing_request');
+    const response = await dataGateway.marcarConversaComoResolvida(conversaId);
 
-      setConversations(updated);
-      await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(updated));
-      console.log('DataContext: Conversation resolved successfully');
+    if (response.status === 'ok') {
+      await loadConversas();
+      endOperation();
       return true;
-    } catch (error) {
-      console.error('DataContext: Resolve conversation error:', error);
+    } else {
+      setError({ ...response, module: 'chat' });
       return false;
     }
-  }, [conversations]);
+  }, [startOperation, endOperation, setError, loadConversas]);
 
-  const catalogByArea = useCallback((area: string): CatalogItem[] => {
-    return catalog.filter(item => item.category === area);
-  }, [catalog]);
+  const reabrirConversa = useCallback(async (conversaId: string): Promise<boolean> => {
+    startOperation('reabrirConversa', 'processing_request');
+    const response = await dataGateway.reabrirConversa(conversaId);
 
-  const clearData = useCallback(async () => {
-    console.log('DataContext: Clearing all data');
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.CONVERSATIONS);
-      await AsyncStorage.removeItem(STORAGE_KEYS.CATALOG);
-      await AsyncStorage.removeItem(STORAGE_KEYS.ANNOUNCEMENTS);
-      setConversations([]);
-      setCatalog([]);
-      setAnnouncements([]);
-      console.log('DataContext: Data cleared successfully');
-    } catch (error) {
-      console.error('DataContext: Clear data error:', error);
+    if (response.status === 'ok') {
+      await loadConversas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'chat' });
+      return false;
     }
-  }, []);
+  }, [startOperation, endOperation, setError, loadConversas]);
+
+  const criarMaquina = useCallback(async (data: Omit<Maquina, 'id'>): Promise<boolean> => {
+    startOperation('criarMaquina', 'sending_data');
+    const response = await dataGateway.criarMaquina(data);
+
+    if (response.status === 'ok') {
+      await loadMaquinas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'catalog' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadMaquinas]);
+
+  const atualizarMaquina = useCallback(async (id: string, data: Partial<Maquina>): Promise<boolean> => {
+    startOperation('atualizarMaquina', 'sending_data');
+    const response = await dataGateway.atualizarMaquina(id, data);
+
+    if (response.status === 'ok') {
+      await loadMaquinas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'catalog' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadMaquinas]);
+
+  const removerMaquina = useCallback(async (id: string): Promise<boolean> => {
+    startOperation('removerMaquina', 'processing_request');
+    const response = await dataGateway.removerMaquina(id);
+
+    if (response.status === 'ok') {
+      await loadMaquinas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'catalog' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadMaquinas]);
+
+  const criarPeca = useCallback(async (data: Omit<Peca, 'id'>): Promise<boolean> => {
+    startOperation('criarPeca', 'sending_data');
+    const response = await dataGateway.criarPeca(data);
+
+    if (response.status === 'ok') {
+      await loadPecas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'catalog' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadPecas]);
+
+  const atualizarPeca = useCallback(async (id: string, data: Partial<Peca>): Promise<boolean> => {
+    startOperation('atualizarPeca', 'sending_data');
+    const response = await dataGateway.atualizarPeca(id, data);
+
+    if (response.status === 'ok') {
+      await loadPecas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'catalog' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadPecas]);
+
+  const removerPeca = useCallback(async (id: string): Promise<boolean> => {
+    startOperation('removerPeca', 'processing_request');
+    const response = await dataGateway.removerPeca(id);
+
+    if (response.status === 'ok') {
+      await loadPecas();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'catalog' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadPecas]);
+
+  const criarColaborador = useCallback(async (data: {
+    email: string;
+    fullName: string;
+    roles: any[];
+    password: string;
+  }): Promise<boolean> => {
+    startOperation('criarColaborador', 'sending_data');
+    const response = await dataGateway.criarColaborador(data);
+
+    if (response.status === 'ok') {
+      await loadColaboradores();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'admin' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadColaboradores]);
+
+  const atualizarColaborador = useCallback(async (id: string, data: Partial<User>): Promise<boolean> => {
+    startOperation('atualizarColaborador', 'sending_data');
+    const response = await dataGateway.atualizarColaborador(id, data);
+
+    if (response.status === 'ok') {
+      await loadColaboradores();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'admin' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadColaboradores]);
+
+  const removerColaborador = useCallback(async (id: string): Promise<boolean> => {
+    startOperation('removerColaborador', 'processing_request');
+    const response = await dataGateway.removerColaborador(id);
+
+    if (response.status === 'ok') {
+      await loadColaboradores();
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'admin' });
+      return false;
+    }
+  }, [startOperation, endOperation, setError, loadColaboradores]);
 
   return useMemo(() => ({
-    conversations,
-    catalog,
-    announcements,
-    createConversation,
-    sendMessage,
-    resolveConversation,
-    catalogByArea,
-    clearData,
-  }), [conversations, catalog, announcements, createConversation, sendMessage, resolveConversation, catalogByArea, clearData]);
+    conversas,
+    mensagens,
+    maquinasVenda,
+    maquinasLocacao,
+    pecas,
+    colaboradores,
+    clientes,
+    criarConversa,
+    loadMensagens,
+    enviarMensagem,
+    marcarConversaComoResolvida,
+    reabrirConversa,
+    criarMaquina,
+    atualizarMaquina,
+    removerMaquina,
+    criarPeca,
+    atualizarPeca,
+    removerPeca,
+    criarColaborador,
+    atualizarColaborador,
+    removerColaborador,
+    refreshConversas: loadConversas,
+    refreshMaquinas: loadMaquinas,
+    refreshPecas: loadPecas,
+    refreshColaboradores: loadColaboradores,
+    refreshClientes: loadClientes,
+  }), [
+    conversas,
+    mensagens,
+    maquinasVenda,
+    maquinasLocacao,
+    pecas,
+    colaboradores,
+    clientes,
+    criarConversa,
+    loadMensagens,
+    enviarMensagem,
+    marcarConversaComoResolvida,
+    reabrirConversa,
+    criarMaquina,
+    atualizarMaquina,
+    removerMaquina,
+    criarPeca,
+    atualizarPeca,
+    removerPeca,
+    criarColaborador,
+    atualizarColaborador,
+    removerColaborador,
+    loadConversas,
+    loadMaquinas,
+    loadPecas,
+    loadColaboradores,
+    loadClientes,
+  ]);
 });

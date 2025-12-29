@@ -4,9 +4,9 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { AppStateProvider } from "@/contexts/AppStateContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
-import { MockDataProvider, useMockData } from "@/contexts/MockDataContext";
 import { trpc, trpcClient } from "@/lib/trpc";
 import Colors from "@/constants/Colors";
 
@@ -15,20 +15,19 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-    const { isLoading: authLoading } = useAuth();
-    const { isLoading: mockLoading } = useMockData();
+    const { isLoading } = useAuth();
     const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
-        if (!authLoading && !mockLoading) {
-            console.log('RootLayout: All contexts loaded, hiding splash');
+        if (!isLoading) {
+            console.log('RootLayout: Auth loaded, hiding splash');
             setIsReady(true);
             SplashScreen.hideAsync();
         }
-    }, [authLoading, mockLoading]);
+    }, [isLoading]);
 
     if (!isReady) {
-        console.log('RootLayout: Waiting for contexts to load...', { authLoading, mockLoading });
+        console.log('RootLayout: Waiting for auth to load...', { isLoading });
         return (
             <View style={{ flex: 1, backgroundColor: '#2B2B2B', justifyContent: 'center', alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#FF0000" />
@@ -63,13 +62,13 @@ export default function RootLayout() {
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
                 <GestureHandlerRootView style={{ flex: 1 }}>
-                    <AuthProvider>
-                        <DataProvider>
-                            <MockDataProvider>
+                    <AppStateProvider>
+                        <AuthProvider>
+                            <DataProvider>
                                 <RootLayoutNav />
-                            </MockDataProvider>
-                        </DataProvider>
-                    </AuthProvider>
+                            </DataProvider>
+                        </AuthProvider>
+                    </AppStateProvider>
                 </GestureHandlerRootView>
             </QueryClientProvider>
         </trpc.Provider>

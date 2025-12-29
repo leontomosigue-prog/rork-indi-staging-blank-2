@@ -2,13 +2,15 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import { useRouter } from 'expo-router';
 import { MessageSquare } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
+import { useAppState } from '@/contexts/AppStateContext';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { listConversasPorUsuario, isLoading } = useMockData();
+  const { conversas } = useData();
+  const { isLoading } = useAppState();
   const router = useRouter();
 
   if (!user) {
@@ -19,7 +21,7 @@ export default function HomeScreen() {
     );
   }
 
-  const conversasAbertas = listConversasPorUsuario(user).filter(c => c.status === 'aberta');
+  const conversasAbertas = conversas.filter(c => c.status === 'aberta');
 
   const formatDate = (date: string) => {
     const now = new Date();

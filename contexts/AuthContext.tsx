@@ -1,81 +1,60 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import createContextHook from '@nkzw/create-context-hook';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { trpc } from '@/lib/trpc';
-
-type UpdateUserInput = {
-  name?: string;
-  email?: string;
-  phone?: string;
-  cpf?: string;
-  birthDate?: string;
-  companyName?: string;
-  cnpj?: string;
-  profileImageUrl?: string;
-  fullName?: string;
-};
-
-const STORAGE_KEY = '@indi:userId';
+import { dataGateway } from '@/lib/data-gateway';
+import { useAppState } from './AppStateContext';
+import type { User } from '@/types';
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
-  
-  const userQuery = trpc.users.getMe.useQuery(
-    { userId: userId! },
-    { enabled: !!userId, retry: false }
-  );
+  const { startOperation, endOperation, setError } = useAppState();
+  const [user, setUser] = useState<User | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     const init = async () => {
-      console.log('AuthContext: Initializing with backend...');
-      try {
-        await ensureSeedsMutation.mutateAsync();
-        console.log('AuthContext: Seeds ensured');
+      console.log('AuthContext: Initializing...');
+      startOperation('initAuth', 'initial_loading');
 
-        const storedUserId = await AsyncStorage.getItem(STORAGE_KEY);
-        console.log('AuthContext: Stored userId:', storedUserId ? 'Found' : 'Not found');
-        
-        if (storedUserId) {
-          setUserId(storedUserId);
-        }
-      } catch (error) {
-        console.error('AuthContext: Initialization error:', error);
-      } finally {
-        setIsLoading(false);
+      const seedResponse = await dataGateway.initializeSeeds();
+      if (seedResponse.status === 'error') {
+        console.error('AuthContext: Failed to initialize seeds:', seedResponse.errorMessage);
+        setError({ ...seedResponse, module: 'auth' });
+        setIsInitializing(false);
+        endOperation();
+        return;
       }
+
+      const autoLoginResponse = await dataGateway.autoLogin();
+      if (autoLoginResponse.status === 'ok') {
+        setUser(autoLoginResponse.data);
+        console.log('AuthContext: Auto-login successful:', autoLoginResponse.data?.id);
+      } else {
+        console.error('AuthContext: Auto-login failed:', autoLoginResponse.errorMessage);
+        setError({ ...autoLoginResponse, module: 'auth' });
+      }
+
+      setIsInitializing(false);
+      endOperation();
     };
+
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-
-
-  const loginMutation = trpc.users.login.useMutation();
+  }, [startOperation, endOperation, setError]);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    console.log('🔵 LOGIN tRPC start:', email);
-    
-    try {
-      const result = await loginMutation.mutateAsync({ email, password });
-      
-      if (result.user) {
-        console.log('🔵 LOGIN tRPC success:', result.user.id);
-        setUserId(result.user.id);
-        await AsyncStorage.setItem(STORAGE_KEY, result.user.id);
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('🔴 LOGIN tRPC error:', error);
+    console.log('AuthContext: login called');
+    startOperation('login', 'processing_request');
+
+    const response = await dataGateway.login(email, password);
+
+    if (response.status === 'ok') {
+      setUser(response.data);
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'auth' });
       return false;
     }
-  }, [loginMutation]);
-
-  const registerMutation = trpc.users.register.useMutation();
+  }, [startOperation, endOperation, setError]);
 
   const register = useCallback(async (data: {
     email: string;
@@ -86,101 +65,56 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     companyName?: string;
     cnpj?: string;
   }): Promise<boolean> => {
-    console.log('AuthContext: register called with backend');
-    try {
-      const result = await registerMutation.mutateAsync(data);
-      
-      if (result.user) {
-        console.log('AuthContext: Registration successful');
-        setUserId(result.user.id);
-        await AsyncStorage.setItem(STORAGE_KEY, result.user.id);
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('AuthContext: Registration error:', error);
+    console.log('AuthContext: register called');
+    startOperation('register', 'processing_request');
+
+    const response = await dataGateway.register(data);
+
+    if (response.status === 'ok') {
+      setUser(response.data);
+      endOperation();
+      return true;
+    } else {
+      setError({ ...response, module: 'auth' });
       return false;
     }
-  }, [registerMutation]);
+  }, [startOperation, endOperation, setError]);
 
   const logout = useCallback(async () => {
     console.log('AuthContext: logout called');
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      setUserId(null);
-      console.log('AuthContext: Logout successful');
-    } catch (error) {
-      console.error('AuthContext: Logout error:', error);
+    startOperation('logout', 'processing_request');
+
+    const response = await dataGateway.logout();
+
+    if (response.status === 'ok') {
+      setUser(null);
+      endOperation();
+    } else {
+      setError({ ...response, module: 'auth' });
     }
-  }, []);
+  }, [startOperation, endOperation, setError]);
 
-  const updateMeMutation = trpc.users.updateMe.useMutation({
-    onSuccess: () => {
-      userQuery.refetch();
-    },
-  });
+  const updateUser = useCallback(async (updates: Partial<User>): Promise<boolean> => {
+    console.log('AuthContext: updateUser called');
+    if (!user) return false;
 
-  const updateUser = useCallback(async (updates: UpdateUserInput): Promise<boolean> => {
-    console.log('AuthContext: updateUser called with backend');
-    if (!userId) return false;
+    startOperation('updateUser', 'processing_request');
 
-    try {
-      const backendUpdates: any = { userId };
-      if (updates.name !== undefined) backendUpdates.name = updates.name;
-      if (updates.fullName !== undefined) backendUpdates.name = updates.fullName;
-      if (updates.email !== undefined) backendUpdates.email = updates.email;
-      if (updates.cpf !== undefined) backendUpdates.cpf = updates.cpf;
-      if (updates.birthDate !== undefined) backendUpdates.birthDate = updates.birthDate;
-      if (updates.companyName !== undefined) backendUpdates.companyName = updates.companyName;
-      if (updates.cnpj !== undefined) backendUpdates.cnpj = updates.cnpj;
-      
-      await updateMeMutation.mutateAsync(backendUpdates as any);
-      console.log('AuthContext: User updated successfully');
+    const response = await dataGateway.updateProfile(user.id, updates);
+
+    if (response.status === 'ok') {
+      setUser(response.data);
+      endOperation();
       return true;
-    } catch (error) {
-      console.error('AuthContext: Update user error:', error);
+    } else {
+      setError({ ...response, module: 'auth' });
       return false;
     }
-  }, [userId, updateMeMutation]);
-
-  const user = useMemo(() => {
-    if (!userQuery.data) return null;
-    
-    const backendUser = userQuery.data;
-    const mappedRoles = backendUser.roles?.map((r: string) => {
-      const roleMap: Record<string, string> = {
-        'admin': 'Admin',
-        'sales': 'Vendas',
-        'rental': 'Locação',
-        'technical': 'Assistência Técnica',
-        'parts': 'Peças',
-      };
-      return roleMap[r] || r;
-    }) || [];
-
-    return {
-      id: backendUser.id,
-      type: mappedRoles.length > 0 ? 'employee' as const : 'client' as const,
-      email: backendUser.email,
-      fullName: backendUser.name,
-      phone: undefined as string | undefined,
-      birthDate: backendUser.birthDate,
-      cpf: backendUser.cpf,
-      companyName: backendUser.companyName,
-      cnpj: backendUser.cnpj,
-      roles: mappedRoles,
-      profileImageUrl: undefined as string | undefined,
-      lgpdConsent: true,
-      lgpdConsentDate: new Date().toISOString(),
-      createdAt: new Date(backendUser.createdAt).toISOString(),
-      updatedAt: new Date(backendUser.updatedAt).toISOString(),
-    };
-  }, [userQuery.data]);
+  }, [user, startOperation, endOperation, setError]);
 
   return useMemo(() => ({
     user,
-    isLoading: isLoading || userQuery.isLoading,
+    isLoading: isInitializing,
     isAuthenticated: !!user,
     biometricAvailable: false,
     login,
@@ -189,5 +123,5 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     logout,
     updateUser,
     toggleBiometric: async () => {},
-  }), [user, isLoading, userQuery.isLoading, login, register, logout, updateUser]);
+  }), [user, isInitializing, login, register, logout, updateUser]);
 });

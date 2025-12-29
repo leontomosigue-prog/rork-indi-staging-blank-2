@@ -15,73 +15,37 @@ import {
 } from 'react-native';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppState } from '@/contexts/AppStateContext';
 import Logo from '@/components/Logo';
 
 export default function LoginScreen() {
   const { login, loginWithBiometric, biometricAvailable, user } = useAuth();
+  const { isLoading, errorState, clearError } = useAppState();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (user) {
-      console.log('🟢 login useEffect: user detected → navigate to tabs');
-      console.log('🟢 login useEffect: user type:', user.type);
-      console.log('🟢 login useEffect: user roles:', user.roles);
-      try {
-        router.replace('/(tabs)/home' as any);
-        console.log('🟢 login useEffect: replace called');
-      } catch (err) {
-        console.log('🟡 login useEffect: replace failed, trying push...', err);
-        try {
-          router.push('/(tabs)/home' as any);
-          console.log('🟢 login useEffect: push called');
-        } catch (err2) {
-          console.log('🟡 login useEffect: push failed, trying setTimeout...', err2);
-          setTimeout(() => {
-            try {
-              router.replace('/(tabs)/home' as any);
-              console.log('🟢 login useEffect: setTimeout replace called');
-            } catch (err3) {
-              console.error('🔴 login useEffect: all navigation attempts failed', err3);
-            }
-          }, 0);
-        }
-      }
+      console.log('Login: user detected, navigating to tabs');
+      router.replace('/(tabs)/home');
     }
   }, [user]);
 
   const handleLogin = async () => {
-    console.log('🟢 handleLogin: Starting login process...');
-    console.log('🟢 handleLogin: Email:', email);
-    setErrorMessage('');
+    console.log('Login: Starting login process');
+    clearError();
     
     if (!email.trim() || !password.trim()) {
-      console.log('🟢 handleLogin: Missing credentials');
-      setErrorMessage('Preencha e-mail e senha');
       return;
     }
 
-    setIsLoading(true);
-    console.log('🟢 handleLogin: Calling login function...');
-    const result = await login(email, password);
-    console.log('🟢 handleLogin: Login result:', result);
-    setIsLoading(false);
-
-    if (!result) {
-      console.log('🔴 handleLogin: Login failed');
-      setErrorMessage('E-mail ou senha incorretos');
-    } else {
-      console.log('🟢 handleLogin: Login successful, user will be set by AuthContext');
-    }
+    await login(email, password);
   };
 
   const handleBiometricLogin = async () => {
-    console.log('handleBiometricLogin: Starting biometric login...');
-    setIsLoading(true);
+    console.log('Login: Starting biometric login');
+    clearError();
     const result = await loginWithBiometric();
-    setIsLoading(false);
 
     if (!result) {
       Alert.alert('Erro', 'Falha na autenticação biométrica');
@@ -126,8 +90,8 @@ export default function LoginScreen() {
               />
             </View>
 
-            {errorMessage ? (
-              <Text style={styles.errorText}>{errorMessage}</Text>
+            {errorState && errorState.module === 'auth' ? (
+              <Text style={styles.errorText}>{errorState.errorMessage || 'Erro ao fazer login'}</Text>
             ) : null}
 
             <Pressable onPress={() => Alert.alert('Recuperar Senha', 'Funcionalidade em desenvolvimento')}>

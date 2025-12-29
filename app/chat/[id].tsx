@@ -11,26 +11,39 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { Send, CheckCircle, MessageCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
+import { useAppState } from '@/contexts/AppStateContext';
+import type { Mensagem } from '@/lib/data-gateway';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const router = useRouter();
-  const { conversas, listMensagens, enviarMensagem, marcarConversaComoResolvida, reabrirConversa } = useMockData();
+  const { conversas, loadMensagens, enviarMensagem, marcarConversaComoResolvida, reabrirConversa, mensagens: allMensagens } = useData();
+  const { isLoading } = useAppState();
   const [messageText, setMessageText] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [isResolving, setIsResolving] = useState(false);
-  const [isReopening, setIsReopening] = useState(false);
+  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   const conversa = conversas.find((c) => c.id === id);
-  const mensagens = id ? listMensagens(id) : [];
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (id) {
+        if (allMensagens[id]) {
+          setMensagens(allMensagens[id]);
+        } else {
+          const msgs = await loadMensagens(id);
+          setMensagens(msgs);
+        }
+      }
+    };
+    loadMessages();
+  }, [id, allMensagens, loadMensagens]);
 
   useEffect(() => {
     if (mensagens.length > 0) {
@@ -43,22 +56,14 @@ export default function ChatScreen() {
   const handleSend = async () => {
     if (!messageText.trim() || !user?.id || !id) return;
 
-    setIsSending(true);
-    try {
-      const mensagem = await enviarMensagem(id, messageText.trim());
-      if (mensagem) {
-        setMessageText('');
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      } else {
-        Alert.alert('Erro', 'Não foi possível enviar a mensagem');
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao enviar a mensagem');
-    } finally {
-      setIsSending(false);
+    const result = await enviarMensagem(id, messageText.trim());
+    if (result) {
+      setMessageText('');
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } else {
+      Alert.alert('Erro', 'Não foi possível enviar a mensagem');
     }
   };
 
@@ -73,15 +78,11 @@ export default function ChatScreen() {
         {
           text: 'Resolver',
           onPress: async () => {
-            setIsResolving(true);
-            try {
-              await marcarConversaComoResolvida(id);
+            const result = await marcarConversaComoResolvida(id);
+            if (result) {
               Alert.alert('Sucesso', 'Conversa marcada como resolvida');
-            } catch (error) {
-              console.error('Error resolving conversation:', error);
+            } else {
               Alert.alert('Erro', 'Ocorreu um erro ao resolver a conversa');
-            } finally {
-              setIsResolving(false);
             }
           },
         },
@@ -92,15 +93,11 @@ export default function ChatScreen() {
   const handleReopen = async () => {
     if (!user?.id || !id) return;
 
-    setIsReopening(true);
-    try {
-      await reabrirConversa(id);
+    const result = await reabrirConversa(id);
+    if (result) {
       Alert.alert('Sucesso', 'Conversa reaberta. Você pode continuar atendendo o cliente.');
-    } catch (error) {
-      console.error('Error reopening conversation:', error);
+    } else {
       Alert.alert('Erro', 'Ocorreu um erro ao reabrir a conversa');
-    } finally {
-      setIsReopening(false);
     }
   };
 
@@ -169,10 +166,10 @@ export default function ChatScreen() {
           title: conversa.titulo,
           headerRight: canResolve
             ? () => (
-                <TouchableOpacity onPress={handleResolve} disabled={isResolving}>
+                <TouchableOpacity onPress={handleResolve} disabled={isLoading}>
                   <CheckCircle
                     size={24}
-                    color={isResolving ? Colors.textLight : '#10b981'}
+                    color={isLoading ? Colors.textLight : '#10b981'}
                   />
                 </TouchableOpacity>
               )
@@ -208,12 +205,12 @@ export default function ChatScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              (!messageText.trim() || isSending) && styles.sendButtonDisabled,
+              (!messageText.trim() || isLoading) && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={!messageText.trim() || isSending}
+            disabled={!messageText.trim() || isLoading}
           >
-            {isSending ? (
+            {isLoading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Send size={20} color="#fff" />
@@ -230,11 +227,11 @@ export default function ChatScreen() {
           </View>
           {user?.type === 'employee' && (
             <TouchableOpacity
-              style={[styles.reopenButton, isReopening && styles.reopenButtonDisabled]}
+              style={[styles.reopenButton, isLoading && styles.reopenButtonDisabled]}
               onPress={handleReopen}
-              disabled={isReopening}
+              disabled={isLoading}
             >
-              {isReopening ? (
+              {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
