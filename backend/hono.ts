@@ -213,6 +213,7 @@ app.use(
   trpcServer({
     router: appRouter,
     createContext,
+    endpoint: '/trpc',
   })
 );
 
@@ -221,6 +222,7 @@ app.use(
   trpcServer({
     router: appRouter,
     createContext,
+    endpoint: '/api/trpc',
   })
 );
 
