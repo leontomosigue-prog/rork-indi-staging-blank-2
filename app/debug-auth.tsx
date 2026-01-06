@@ -428,13 +428,30 @@ export default function DebugAuthScreen() {
       setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
       addLog('success', '\n✅ TODAS AS VERIFICAÇÕES CONCLUÍDAS COM SUCESSO');
     } catch (error: any) {
-      const fullError = `${error?.name || 'Error'}: ${error?.message || String(error)}\nStack: ${error?.stack || 'N/A'}`;
-      setLastErrorFull(fullError);
+      addLog('error', '\n❌❌❌ ERRO COMPLETO DO BACKEND ❌❌❌');
+      addLog('error', `Tipo: ${error?.constructor?.name || error?.name || 'Unknown'}`);
+      addLog('error', `Mensagem: ${error?.message || String(error)}`);
       
-      addLog('error', `Erro fatal: ${error?.name || 'Error'}: ${error?.message || String(error)}`, {
-        stack: error?.stack,
-        cause: error?.cause,
-      });
+      if (error?.data) {
+        addLog('error', 'Data do tRPC:', error.data);
+      }
+      
+      if (error?.shape) {
+        addLog('error', 'Shape do erro tRPC:', error.shape);
+      }
+      
+      if (error?.cause) {
+        addLog('error', 'Causa:', error.cause);
+      }
+      
+      if (error?.stack) {
+        addLog('error', `Stack Trace:\n${error.stack}`);
+      }
+      
+      addLog('error', 'Erro completo (JSON):', JSON.stringify(error, null, 2));
+      
+      const fullError = `ERRO DO BACKEND:\n\nTipo: ${error?.constructor?.name || error?.name || 'Unknown'}\nMensagem: ${error?.message || String(error)}\n\nData: ${error?.data ? JSON.stringify(error.data, null, 2) : 'N/A'}\n\nShape: ${error?.shape ? JSON.stringify(error.shape, null, 2) : 'N/A'}\n\nCause: ${error?.cause ? JSON.stringify(error.cause, null, 2) : 'N/A'}\n\nStack: ${error?.stack || 'N/A'}\n\nObjeto completo:\n${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`;
+      setLastErrorFull(fullError);
       
       setBackendStatus('❌ Backend Error');
       setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
@@ -487,14 +504,31 @@ export default function DebugAuthScreen() {
         addLog('success', 'Navegação executada');
       }
     } catch (error: any) {
-      const fullError = `${error?.name || 'Error'}: ${error?.message || String(error)}\nStack: ${error?.stack || 'N/A'}`;
+      addLog('error', '\n❌❌❌ ERRO COMPLETO DO LOGIN ADMIN ❌❌❌');
+      addLog('error', `Tipo: ${error?.constructor?.name || error?.name || 'Unknown'}`);
+      addLog('error', `Mensagem: ${error?.message || String(error)}`);
+      
+      if (error?.data) {
+        addLog('error', 'Data do tRPC:', error.data);
+      }
+      
+      if (error?.shape) {
+        addLog('error', 'Shape do erro tRPC:', error.shape);
+      }
+      
+      if (error?.cause) {
+        addLog('error', 'Causa:', error.cause);
+      }
+      
+      if (error?.stack) {
+        addLog('error', `Stack Trace:\n${error.stack}`);
+      }
+      
+      addLog('error', 'Erro completo (JSON):', JSON.stringify(error, null, 2));
+      
+      const fullError = `ERRO DO LOGIN ADMIN:\n\nTipo: ${error?.constructor?.name || error?.name || 'Unknown'}\nMensagem: ${error?.message || String(error)}\n\nData: ${error?.data ? JSON.stringify(error.data, null, 2) : 'N/A'}\n\nShape: ${error?.shape ? JSON.stringify(error.shape, null, 2) : 'N/A'}\n\nCause: ${error?.cause ? JSON.stringify(error.cause, null, 2) : 'N/A'}\n\nStack: ${error?.stack || 'N/A'}\n\nObjeto completo:\n${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`;
       setLastErrorFull(fullError);
       
-      addLog('error', `Erro no login admin: ${error?.message || String(error)}`, {
-        name: error?.name,
-        stack: error?.stack,
-        cause: error?.cause,
-      });
       setLastError(error?.message || String(error));
     } finally {
       setIsLoadingAdmin(false);
@@ -524,10 +558,31 @@ export default function DebugAuthScreen() {
         addLog('success', 'Navegação executada');
       }
     } catch (error: any) {
-      const fullError = `${error?.name || 'Error'}: ${error?.message || String(error)}\nStack: ${error?.stack || 'N/A'}`;
+      addLog('error', '\n❌❌❌ ERRO COMPLETO DO LOGIN CLIENTE ❌❌❌');
+      addLog('error', `Tipo: ${error?.constructor?.name || error?.name || 'Unknown'}`);
+      addLog('error', `Mensagem: ${error?.message || String(error)}`);
+      
+      if (error?.data) {
+        addLog('error', 'Data do tRPC:', error.data);
+      }
+      
+      if (error?.shape) {
+        addLog('error', 'Shape do erro tRPC:', error.shape);
+      }
+      
+      if (error?.cause) {
+        addLog('error', 'Causa:', error.cause);
+      }
+      
+      if (error?.stack) {
+        addLog('error', `Stack Trace:\n${error.stack}`);
+      }
+      
+      addLog('error', 'Erro completo (JSON):', JSON.stringify(error, null, 2));
+      
+      const fullError = `ERRO DO LOGIN CLIENTE:\n\nTipo: ${error?.constructor?.name || error?.name || 'Unknown'}\nMensagem: ${error?.message || String(error)}\n\nData: ${error?.data ? JSON.stringify(error.data, null, 2) : 'N/A'}\n\nShape: ${error?.shape ? JSON.stringify(error.shape, null, 2) : 'N/A'}\n\nCause: ${error?.cause ? JSON.stringify(error.cause, null, 2) : 'N/A'}\n\nStack: ${error?.stack || 'N/A'}\n\nObjeto completo:\n${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`;
       setLastErrorFull(fullError);
       
-      addLog('error', `Erro no login cliente: ${String(error)}`, error);
       setLastError(String(error));
     } finally {
       setIsLoadingClient(false);
@@ -588,9 +643,11 @@ export default function DebugAuthScreen() {
           </View>
         )}
         {lastErrorFull && (
-          <View style={styles.highlightBox}>
-            <Text style={styles.highlightTitle}>Último Erro Completo:</Text>
-            <Text style={[styles.infoText, { fontSize: 10 }]}>{lastErrorFull}</Text>
+          <View style={[styles.highlightBox, { borderLeftColor: '#ef4444' }]}>
+            <Text style={[styles.highlightTitle, { color: '#ef4444' }]}>❌ ERRO COMPLETO DO BACKEND:</Text>
+            <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled>
+              <Text style={[styles.infoText, { fontSize: 10, color: '#fca5a5' }]}>{lastErrorFull}</Text>
+            </ScrollView>
           </View>
         )}
         <Pressable style={styles.smallButton} onPress={() => {
