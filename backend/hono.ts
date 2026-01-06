@@ -18,9 +18,7 @@ console.log('🚀 BACKEND STARTING');
 console.log('   ID:', BACKEND_ID);
 console.log('   Version:', BACKEND_VERSION);
 console.log('   Build Timestamp:', BUILD_TIMESTAMP);
-console.log('   tRPC will be mounted at:');
-console.log('     - /api/trpc/* (canonical)');
-console.log('     - /trpc/* (compatibility)');
+console.log('   tRPC mounted at: /api/trpc/* (ÚNICO MOUNT)');
 
 async function initializeData() {
   console.log('🔧 Initializing backend data...');
@@ -145,23 +143,23 @@ app.get('/health', (c) => c.json({
 
 app.get('/', (c) => c.json({ message: 'Hello World1' }));
 
-app.use(
-  '/trpc/*',
-  trpcServer({
-    router: appRouter,
-    createContext,
-    endpoint: '/trpc',
-  })
-);
-
 api.use('/trpc/*', async (c, next) => {
+  const url = new URL(c.req.url);
+  const computedAfterApiTrpc = url.pathname.replace(/^\/api\/trpc\/?/, '');
+  
+  console.log('[TRPC_FORENSIC]', {
+    method: c.req.method,
+    pathname: url.pathname,
+    reqPath: c.req.path,
+    computedAfterApiTrpc,
+  });
+  
   const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || process.env.NODE_ENV === 'development';
   
   if (shouldLog) {
     const startTime = Date.now();
     const traceId = c.req.header('x-debug-trace-id');
     const requestId = c.req.header('x-debug-request-id');
-    const url = new URL(c.req.url);
     
     console.log('═══════════════════════════════════════');
     console.log('📥 [TRPC_IN] BACKEND tRPC REQUEST');
@@ -173,6 +171,7 @@ api.use('/trpc/*', async (c, next) => {
     console.log('Full URL:', c.req.url);
     console.log('Pathname:', url.pathname);
     console.log('Path (c.req.path):', c.req.path);
+    console.log('Computed Path After /api/trpc:', computedAfterApiTrpc);
     console.log('Query:', JSON.stringify(c.req.query()));
     console.log('Content-Type:', c.req.header('content-type'));
     console.log('User-Agent:', c.req.header('user-agent'));
@@ -221,12 +220,39 @@ api.get('/health', (c) => c.json({
   at: new Date().toISOString() 
 }));
 
+api.get('/__trpc_routes', (c) => {
+  try {
+    const procedures = Object.keys((appRouter as any)._def?.procedures ?? {}).sort();
+    return c.json({
+      ok: true,
+      count: procedures.length,
+      procedures,
+    });
+  } catch (error) {
+    return c.json({
+      ok: false,
+      error: String(error),
+      message: 'Failed to list procedures',
+    }, 500);
+  }
+});
+
+api.all('/__echo_trpc_path/*', (c) => {
+  const url = new URL(c.req.url);
+  return c.json({
+    method: c.req.method,
+    pathname: url.pathname,
+    afterApiTrpc: url.pathname.replace(/^\/api\/trpc\/?/, ''),
+    afterApi: url.pathname.replace(/^\/api\/?/, ''),
+    reqPath: c.req.path,
+  });
+});
+
 api.use(
   '/trpc/*',
   trpcServer({
     router: appRouter,
     createContext,
-    endpoint: '/trpc',
   })
 );
 
