@@ -109,6 +109,65 @@ export default function DebugAuthScreen() {
     addLog('info', 'Logs limpos');
   }, [addLog]);
 
+  const safeFetch = useCallback(async (url: string, options?: RequestInit) => {
+    const startTime = Date.now();
+    const method = options?.method || 'GET';
+    
+    try {
+      const response = await fetch(url, options);
+      const durationMs = Date.now() - startTime;
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      
+      let json = undefined;
+      let parseResult = 'not JSON';
+      
+      if (contentType.includes('application/json')) {
+        try {
+          json = JSON.parse(text);
+          parseResult = 'JSON parsed successfully';
+        } catch (e: any) {
+          parseResult = `JSON parse failed: ${e.message}`;
+        }
+      }
+      
+      const result = {
+        ok: response.ok,
+        status: response.status,
+        contentType,
+        text,
+        json,
+        durationMs,
+        parseResult,
+      };
+      
+      if (response.status >= 400) {
+        const truncated = text.length > 1000 ? text.substring(0, 1000) + '... [TRUNCATED]' : text;
+        addLog('error', `❌ ${method} ${url} -> ${response.status}`, {
+          contentType,
+          body: truncated,
+        });
+      }
+      
+      return result;
+    } catch (error: any) {
+      const durationMs = Date.now() - startTime;
+      addLog('error', `❌ Network error: ${method} ${url}`, {
+        error: error.message,
+      });
+      
+      return {
+        ok: false,
+        status: 0,
+        contentType: '',
+        text: `Network error: ${error.message}`,
+        json: undefined,
+        durationMs,
+        parseResult: 'network error',
+      };
+    }
+  }, [addLog]);
+
   const copyLogs = useCallback(async () => {
     try {
       let logText = '═══════════════════════════════════════════════════════\n';
@@ -268,24 +327,24 @@ export default function DebugAuthScreen() {
       const whoamiUrl = `${baseUrl}${prefix}/__whoami`;
       addLog('request', `GET ${whoamiUrl}`);
       
-      const startWhoami = Date.now();
-      const whoamiResponse = await fetch(whoamiUrl, {
+      const whoamiResult = await safeFetch(whoamiUrl, {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
           ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
         },
       });
-      const durationWhoami = Date.now() - startWhoami;
       
-      const whoamiHeaders = Object.fromEntries(whoamiResponse.headers.entries());
-      addLog('response', `Status: ${whoamiResponse.status}`, {
-        headers: whoamiHeaders,
-      });
+      if (!whoamiResult.ok || !whoamiResult.json) {
+        throw new Error(`Falha na validação: ${whoamiResult.status} - ${whoamiResult.text}`);
+      }
       
-      const whoamiBodyRaw = await whoamiResponse.text();
-      const whoamiData = JSON.parse(whoamiBodyRaw);
+      const whoamiData = whoamiResult.json;
       setBackendSignature(whoamiData);
+      
+      addLog('response', `Status: ${whoamiResult.status}`, {
+        contentType: whoamiResult.contentType,
+      });
       
       if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
         addDetailedRequest({
@@ -295,14 +354,13 @@ export default function DebugAuthScreen() {
           method: 'GET',
           url: whoamiUrl,
           headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
-          durationMs: durationWhoami,
-          responseStatus: whoamiResponse.status,
+          durationMs: whoamiResult.durationMs,
+          responseStatus: whoamiResult.status,
           responseHeaders: {
-            'content-type': whoamiHeaders['content-type'] || '',
-            'content-length': whoamiHeaders['content-length'] || '',
+            'content-type': whoamiResult.contentType,
           },
-          responseBodyRaw: whoamiBodyRaw,
-          parseResult: 'JSON parsed successfully',
+          responseBodyRaw: whoamiResult.text,
+          parseResult: whoamiResult.parseResult,
         });
       }
       
@@ -316,24 +374,19 @@ export default function DebugAuthScreen() {
       const pingUrl = `${baseUrl}${prefix}/ping`;
       addLog('request', `GET ${pingUrl}`);
       
-      const startPing = Date.now();
-      const pingResponse = await fetch(pingUrl, {
+      const pingResult = await safeFetch(pingUrl, {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
           ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
         },
       });
-      const durationPing = Date.now() - startPing;
       
-      const pingHeaders = Object.fromEntries(pingResponse.headers.entries());
-      addLog('response', `Status: ${pingResponse.status}`, {
-        headers: pingHeaders,
-      });
+      if (!pingResult.ok || !pingResult.json) {
+        throw new Error(`Ping falhou: ${pingResult.status} - ${pingResult.text}`);
+      }
       
-      const pingBodyRaw = await pingResponse.text();
-      const pingData = JSON.parse(pingBodyRaw);
-      addLog('success', `✅ Ping OK: ${JSON.stringify(pingData)}`);
+      addLog('success', `✅ Ping OK: ${JSON.stringify(pingResult.json)}`);
       
       if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
         addDetailedRequest({
@@ -343,14 +396,13 @@ export default function DebugAuthScreen() {
           method: 'GET',
           url: pingUrl,
           headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
-          durationMs: durationPing,
-          responseStatus: pingResponse.status,
+          durationMs: pingResult.durationMs,
+          responseStatus: pingResult.status,
           responseHeaders: {
-            'content-type': pingHeaders['content-type'] || '',
-            'content-length': pingHeaders['content-length'] || '',
+            'content-type': pingResult.contentType,
           },
-          responseBodyRaw: pingBodyRaw,
-          parseResult: 'JSON parsed successfully',
+          responseBodyRaw: pingResult.text,
+          parseResult: pingResult.parseResult,
         });
       }
 
@@ -358,24 +410,19 @@ export default function DebugAuthScreen() {
       const healthUrl = `${baseUrl}${prefix}/health`;
       addLog('request', `GET ${healthUrl}`);
       
-      const startHealth = Date.now();
-      const healthResponse = await fetch(healthUrl, {
+      const healthResult = await safeFetch(healthUrl, {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
           ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
         },
       });
-      const durationHealth = Date.now() - startHealth;
       
-      const healthHeaders = Object.fromEntries(healthResponse.headers.entries());
-      addLog('response', `Status: ${healthResponse.status}`, {
-        headers: healthHeaders,
-      });
+      if (!healthResult.ok || !healthResult.json) {
+        throw new Error(`Health falhou: ${healthResult.status} - ${healthResult.text}`);
+      }
       
-      const healthBodyRaw = await healthResponse.text();
-      const healthData = JSON.parse(healthBodyRaw);
-      addLog('success', `✅ Health OK: ${JSON.stringify(healthData)}`);
+      addLog('success', `✅ Health OK: ${JSON.stringify(healthResult.json)}`);
       
       if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
         addDetailedRequest({
@@ -385,24 +432,76 @@ export default function DebugAuthScreen() {
           method: 'GET',
           url: healthUrl,
           headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
-          durationMs: durationHealth,
-          responseStatus: healthResponse.status,
+          durationMs: healthResult.durationMs,
+          responseStatus: healthResult.status,
           responseHeaders: {
-            'content-type': healthHeaders['content-type'] || '',
-            'content-length': healthHeaders['content-length'] || '',
+            'content-type': healthResult.contentType,
           },
-          responseBodyRaw: healthBodyRaw,
-          parseResult: 'JSON parsed successfully',
+          responseBodyRaw: healthResult.text,
+          parseResult: healthResult.parseResult,
         });
       }
 
-      addLog('info', '\n--- TESTE 5: tRPC CONFIGURATION ---');
+      addLog('info', '\n--- TESTE 5: DEBUG ROUTES (Verificar Procedures) ---');
+      const trpcRoutesUrl = `${baseUrl}${prefix}/__trpc_routes`;
+      addLog('request', `GET ${trpcRoutesUrl}`);
+      
+      const routesResult = await safeFetch(trpcRoutesUrl, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json',
+          ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
+        },
+      });
+      
+      if (routesResult.status === 404) {
+        addLog('error', '❌ __trpc_routes não existe (backend não foi atualizado)');
+        addLog('error', `URL tentada: ${trpcRoutesUrl}`);
+        addLog('error', `Status: ${routesResult.status}`);
+        addLog('error', `Body: ${routesResult.text}`);
+      } else if (!routesResult.ok || !routesResult.json) {
+        addLog('error', `❌ Falha ao buscar routes: ${routesResult.status} - ${routesResult.text}`);
+      } else {
+        const routesData = routesResult.json;
+        addLog('success', `✅ __trpc_routes OK: ${routesData.count} procedures encontradas`);
+        
+        const hasEnsureSeeds = routesData.procedures?.includes('users.ensureSeeds');
+        const hasLogin = routesData.procedures?.includes('users.login');
+        
+        if (hasEnsureSeeds && hasLogin) {
+          addLog('success', '✅ Procedures users.ensureSeeds e users.login ENCONTRADAS');
+        } else {
+          addLog('error', `❌ Procedures faltando: ${!hasEnsureSeeds ? 'users.ensureSeeds ' : ''}${!hasLogin ? 'users.login' : ''}`);
+        }
+        
+        addLog('info', `Todas procedures: ${JSON.stringify(routesData.procedures, null, 2)}`);
+      }
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId: newTraceId,
+          testName: 'Debug Routes',
+          timestamp: new Date().toISOString(),
+          method: 'GET',
+          url: trpcRoutesUrl,
+          headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
+          durationMs: routesResult.durationMs,
+          responseStatus: routesResult.status,
+          responseHeaders: {
+            'content-type': routesResult.contentType,
+          },
+          responseBodyRaw: routesResult.text,
+          parseResult: routesResult.parseResult,
+        });
+      }
+
+      addLog('info', '\n--- TESTE 6: tRPC CONFIGURATION ---');
       const finalTrpcUrl = getTrpcUrl();
       addLog('info', `URL FINAL DO tRPC: ${finalTrpcUrl}`);
       addLog('info', `Montagem: \${baseUrl}\${prefix}/trpc`);
       addLog('info', `Resultado: ${finalTrpcUrl}`);
       
-      addLog('info', '\n--- TESTE 6: tRPC ensureSeeds ---');
+      addLog('info', '\n--- TESTE 7: tRPC ensureSeeds ---');
       const ensureSeedsUrl = `${finalTrpcUrl}/users.ensureSeeds`;
       addLog('request', `POST ${ensureSeedsUrl}`);
       
@@ -456,7 +555,7 @@ export default function DebugAuthScreen() {
       setBackendStatus('❌ Backend Error');
       setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
     }
-  }, [ensureSeedsMutation, addLog, addDetailedRequest]);
+  }, [ensureSeedsMutation, addLog, addDetailedRequest, safeFetch]);
 
   useEffect(() => {
     checkBackend();
@@ -613,7 +712,7 @@ export default function DebugAuthScreen() {
         {detectedPrefix !== null && (
           <View style={styles.highlightBox}>
             <Text style={styles.highlightTitle}>🎯 PREFIXO DETECTADO:</Text>
-            <Text style={styles.highlightValue}>&quot;{detectedPrefix}&quot;</Text>
+            <Text style={styles.highlightValue}>{`"${detectedPrefix}"`}</Text>
           </View>
         )}
         {backendSignature && (
@@ -767,7 +866,7 @@ export default function DebugAuthScreen() {
         <Text style={styles.sectionTitle}>Instruções</Text>
         <Text style={styles.instructionsText}>
           1. Verifique os logs acima para ver todas as comunicações{'\n'}
-          2. Pressione &quot;Recarregar&quot; para testar novamente{'\n'}
+          2. Pressione {`"Recarregar"`} para testar novamente{'\n'}
           3. Use os botões de login para testar autenticação{'\n'}
           4. Todos os requests e responses estão nos logs{'\n'}
           {'\n'}
