@@ -12,14 +12,15 @@ const BACKEND_VERSION = '1.0.0';
 const BUILD_TIMESTAMP = Date.now();
 
 const app = new Hono();
+const api = new Hono();
 
 console.log('🚀 BACKEND STARTING');
 console.log('   ID:', BACKEND_ID);
 console.log('   Version:', BACKEND_VERSION);
 console.log('   Build Timestamp:', BUILD_TIMESTAMP);
 console.log('   tRPC will be mounted at:');
-console.log('     - /trpc/*');
-console.log('     - /api/trpc/*');
+console.log('     - /api/trpc/* (canonical)');
+console.log('     - /trpc/* (compatibility)');
 
 async function initializeData() {
   console.log('🔧 Initializing backend data...');
@@ -117,49 +118,6 @@ app.use('*', cors({
   credentials: false,
 }));
 
-app.use('/api/trpc/*', async (c, next) => {
-  const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || process.env.NODE_ENV === 'development';
-  
-  if (shouldLog) {
-    const startTime = Date.now();
-    const traceId = c.req.header('x-debug-trace-id');
-    const requestId = c.req.header('x-debug-request-id');
-    
-    console.log('═══════════════════════════════════════');
-    console.log('📥 BACKEND tRPC REQUEST');
-    console.log('═══════════════════════════════════════');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Trace ID:', traceId || 'none');
-    console.log('Request ID:', requestId || 'none');
-    console.log('Method:', c.req.method);
-    console.log('Path:', c.req.path);
-    console.log('Query:', JSON.stringify(c.req.query()));
-    console.log('Content-Type:', c.req.header('content-type'));
-    console.log('User-Agent:', c.req.header('user-agent'));
-    
-    await next();
-    
-    const durationMs = Date.now() - startTime;
-    
-    console.log('═══════════════════════════════════════');
-    console.log('📤 BACKEND tRPC RESPONSE');
-    console.log('═══════════════════════════════════════');
-    console.log('Trace ID:', traceId || 'none');
-    console.log('Request ID:', requestId || 'none');
-    console.log('Duration:', durationMs, 'ms');
-    console.log('Status:', c.res.status);
-    
-    if (traceId) {
-      c.header('x-debug-trace-id', traceId);
-    }
-    if (requestId) {
-      c.header('x-debug-request-id', requestId);
-    }
-  } else {
-    await next();
-  }
-});
-
 app.options('*', (c) => {
   return c.body(null, 204);
 });
@@ -185,27 +143,6 @@ app.get('/health', (c) => c.json({
   at: new Date().toISOString() 
 }));
 
-app.get('/api/__whoami', (c) => c.json({ 
-  id: BACKEND_ID, 
-  version: BACKEND_VERSION, 
-  buildTimestamp: BUILD_TIMESTAMP,
-  at: new Date().toISOString()
-}));
-
-app.get('/api/ping', (c) => c.json({ 
-  ok: true, 
-  id: BACKEND_ID, 
-  version: BACKEND_VERSION,
-  at: new Date().toISOString() 
-}));
-
-app.get('/api/health', (c) => c.json({ 
-  ok: true, 
-  id: BACKEND_ID, 
-  version: BACKEND_VERSION,
-  at: new Date().toISOString() 
-}));
-
 app.get('/', (c) => c.json({ message: 'Hello World1' }));
 
 app.use(
@@ -217,13 +154,82 @@ app.use(
   })
 );
 
-app.use(
-  '/api/trpc/*',
+api.use('/trpc/*', async (c, next) => {
+  const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || process.env.NODE_ENV === 'development';
+  
+  if (shouldLog) {
+    const startTime = Date.now();
+    const traceId = c.req.header('x-debug-trace-id');
+    const requestId = c.req.header('x-debug-request-id');
+    const url = new URL(c.req.url);
+    
+    console.log('═══════════════════════════════════════');
+    console.log('📥 [TRPC_IN] BACKEND tRPC REQUEST');
+    console.log('═══════════════════════════════════════');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Trace ID:', traceId || 'none');
+    console.log('Request ID:', requestId || 'none');
+    console.log('Method:', c.req.method);
+    console.log('Full URL:', c.req.url);
+    console.log('Pathname:', url.pathname);
+    console.log('Path (c.req.path):', c.req.path);
+    console.log('Query:', JSON.stringify(c.req.query()));
+    console.log('Content-Type:', c.req.header('content-type'));
+    console.log('User-Agent:', c.req.header('user-agent'));
+    
+    await next();
+    
+    const durationMs = Date.now() - startTime;
+    
+    console.log('═══════════════════════════════════════');
+    console.log('📤 [TRPC_OUT] BACKEND tRPC RESPONSE');
+    console.log('═══════════════════════════════════════');
+    console.log('Trace ID:', traceId || 'none');
+    console.log('Request ID:', requestId || 'none');
+    console.log('Duration:', durationMs, 'ms');
+    console.log('Status:', c.res.status);
+    
+    if (traceId) {
+      c.header('x-debug-trace-id', traceId);
+    }
+    if (requestId) {
+      c.header('x-debug-request-id', requestId);
+    }
+  } else {
+    await next();
+  }
+});
+
+api.get('/__whoami', (c) => c.json({ 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION, 
+  buildTimestamp: BUILD_TIMESTAMP,
+  at: new Date().toISOString()
+}));
+
+api.get('/ping', (c) => c.json({ 
+  ok: true, 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION,
+  at: new Date().toISOString() 
+}));
+
+api.get('/health', (c) => c.json({ 
+  ok: true, 
+  id: BACKEND_ID, 
+  version: BACKEND_VERSION,
+  at: new Date().toISOString() 
+}));
+
+api.use(
+  '/trpc/*',
   trpcServer({
     router: appRouter,
     createContext,
     endpoint: '/trpc',
   })
 );
+
+app.route('/api', api);
 
 export default app;
