@@ -241,7 +241,6 @@ api.use(
   trpcServer({
     router: appRouter,
     createContext,
-    endpoint: '/trpc',
   })
 );
 
