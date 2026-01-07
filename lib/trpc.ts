@@ -178,7 +178,10 @@ export const trpcClient = trpc.createClient({
             console.log('Status:', response.status, response.statusText);
             console.log('Content-Type:', response.headers.get('content-type'));
             console.log('Content-Length:', response.headers.get('content-length'));
+            console.log('Server:', response.headers.get('server') || 'none');
             console.log('x-freestyle-deployment-id:', response.headers.get('x-freestyle-deployment-id') || 'none');
+            console.log('x-indi-backend-id:', response.headers.get('x-indi-backend-id') || 'none');
+            console.log('x-indi-build:', response.headers.get('x-indi-build') || 'none');
             console.log('x-debug-trace-id:', response.headers.get('x-debug-trace-id') || 'none');
             console.log('x-debug-request-id:', response.headers.get('x-debug-request-id') || 'none');
             
@@ -192,7 +195,10 @@ export const trpcClient = trpc.createClient({
               console.error('⚠️ Response is NOT JSON! Content-Type:', contentType);
               console.error('Status:', response.status);
               console.error('Body:', truncated);
+              console.error('Server:', response.headers.get('server') || 'none');
               console.error('x-freestyle-deployment-id:', response.headers.get('x-freestyle-deployment-id') || 'none');
+              console.error('x-indi-backend-id:', response.headers.get('x-indi-backend-id') || 'none');
+              console.error('x-indi-build:', response.headers.get('x-indi-build') || 'none');
             }
             
             const urlParts = url.toString().split('/trpc/');

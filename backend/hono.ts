@@ -111,10 +111,16 @@ app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'x-debug-trace-id', 'x-debug-request-id'],
-  exposeHeaders: ['Content-Length', 'Content-Type', 'x-debug-trace-id', 'x-debug-request-id'],
+  exposeHeaders: ['Content-Length', 'Content-Type', 'x-debug-trace-id', 'x-debug-request-id', 'x-indi-backend-id', 'x-indi-build'],
   maxAge: 86400,
   credentials: false,
 }));
+
+app.use('*', async (c, next) => {
+  await next();
+  c.header('x-indi-backend-id', BACKEND_ID);
+  c.header('x-indi-build', String(BUILD_TIMESTAMP));
+});
 
 app.options('*', (c) => {
   return c.body(null, 204);
@@ -168,6 +174,17 @@ function listProceduresRecursive(router: any, prefix = ''): string[] {
   
   return procedures;
 }
+
+api.post('/postcheck', (c) => {
+  return c.json({
+    ok: true,
+    id: BACKEND_ID,
+    version: BACKEND_VERSION,
+    buildTimestamp: BUILD_TIMESTAMP,
+    at: new Date().toISOString(),
+    message: 'POST endpoint working',
+  });
+});
 
 api.get('/__trpc_routes', (c) => {
   try {
@@ -263,27 +280,6 @@ api.use('/trpc/*', async (c, next) => {
     await next();
   }
 });
-
-api.get('/__whoami', (c) => c.json({ 
-  id: BACKEND_ID, 
-  version: BACKEND_VERSION, 
-  buildTimestamp: BUILD_TIMESTAMP,
-  at: new Date().toISOString()
-}));
-
-api.get('/ping', (c) => c.json({ 
-  ok: true, 
-  id: BACKEND_ID, 
-  version: BACKEND_VERSION,
-  at: new Date().toISOString() 
-}));
-
-api.get('/health', (c) => c.json({ 
-  ok: true, 
-  id: BACKEND_ID, 
-  version: BACKEND_VERSION,
-  at: new Date().toISOString() 
-}));
 
 api.use(
   '/trpc/*',
