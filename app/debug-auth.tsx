@@ -123,11 +123,17 @@ export default function DebugAuthScreen() {
       });
     }
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
     try {
       const response = await fetch(url, {
         ...options,
         headers: requestHeaders,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
       
       const durationMs = Date.now() - startTime;
       const contentType = response.headers.get('content-type') || '';
@@ -217,9 +223,11 @@ export default function DebugAuthScreen() {
       
       return result;
     } catch (error: any) {
+      clearTimeout(timeoutId);
       const durationMs = Date.now() - startTime;
+      const errorMessage = error.name === 'AbortError' ? 'Request timeout (8s)' : error.message;
       addLog('error', `❌ Network error: ${method} ${url}`, {
-        error: error.message,
+        error: errorMessage,
       });
       
       return {
@@ -230,7 +238,7 @@ export default function DebugAuthScreen() {
         xFreestyleDeploymentId: '',
         xIndiBackendId: '',
         xIndiBuild: '',
-        text: `Network error: ${error.message}`,
+        text: `Network error: ${errorMessage}`,
         json: undefined,
         durationMs,
         parseResult: 'network error',
@@ -417,8 +425,43 @@ export default function DebugAuthScreen() {
       addLog('info', `   Version: ${whoamiData.version}`);
       addLog('info', `   Build Timestamp: ${whoamiData.buildTimestamp}`);
       addLog('info', `   Server Time: ${whoamiData.at}`);
+      
+      if (whoamiData.features) {
+        addLog('success', `✅ FEATURES DISPONÍVEIS:`);
+        Object.entries(whoamiData.features).forEach(([key, value]) => {
+          addLog('info', `   ${key}: ${value}`);
+        });
+      }
 
-      addLog('info', '\n--- TESTE 3: POSTCHECK (Testar POST fora do tRPC) ---');
+      addLog('info', '\n--- TESTE 3: DIAG GET ---');
+      const diagUrl = `${baseUrl}${prefix}/__diag`;
+      addLog('request', `GET ${diagUrl}`);
+      
+      const diagResult = await fetchForensics(diagUrl, { method: 'GET' }, 'DIAG GET');
+      
+      if (!diagResult.ok || !diagResult.json) {
+        addLog('error', `❌ __diag falhou: ${diagResult.status} - ${diagResult.text}`);
+      } else {
+        addLog('success', `✅ __diag OK: ${JSON.stringify(diagResult.json)}`);
+      }
+
+      addLog('info', '\n--- TESTE 4: DIAG POST ---');
+      const diagPostUrl = `${baseUrl}${prefix}/__diag_post`;
+      addLog('request', `POST ${diagPostUrl}`);
+      
+      const diagPostResult = await fetchForensics(diagPostUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true }),
+      }, 'DIAG POST');
+      
+      if (!diagPostResult.ok || !diagPostResult.json) {
+        addLog('error', `❌ __diag_post falhou: ${diagPostResult.status} - ${diagPostResult.text}`);
+      } else {
+        addLog('success', `✅ __diag_post OK: ${JSON.stringify(diagPostResult.json)}`);
+      }
+
+      addLog('info', '\n--- TESTE 5: POSTCHECK (Testar POST fora do tRPC) ---');
       const postcheckUrl = `${baseUrl}${prefix}/postcheck`;
       addLog('request', `POST ${postcheckUrl}`);
       
@@ -434,7 +477,23 @@ export default function DebugAuthScreen() {
         addLog('success', `✅ POSTCHECK OK: ${JSON.stringify(postcheckResult.json)}`);
       }
 
-      addLog('info', '\n--- TESTE 4: PING ENDPOINT ---');
+      addLog('info', '\n--- TESTE 6: TRPC RAW (POST em /api/trpc fora do handler) ---');
+      const trpcRawUrl = `${baseUrl}${prefix}/trpc/__raw`;
+      addLog('request', `POST ${trpcRawUrl}`);
+      
+      const trpcRawResult = await fetchForensics(trpcRawUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true }),
+      }, 'TRPC RAW');
+      
+      if (!trpcRawResult.ok || !trpcRawResult.json) {
+        addLog('error', `❌ /trpc/__raw falhou: ${trpcRawResult.status} - ${trpcRawResult.text}`);
+      } else {
+        addLog('success', `✅ /trpc/__raw OK: ${JSON.stringify(trpcRawResult.json)}`);
+      }
+
+      addLog('info', '\n--- TESTE 7: PING ENDPOINT ---');
       const pingUrl = `${baseUrl}${prefix}/ping`;
       addLog('request', `GET ${pingUrl}`);
       
@@ -446,7 +505,7 @@ export default function DebugAuthScreen() {
       
       addLog('success', `✅ Ping OK: ${JSON.stringify(pingResult.json)}`);
 
-      addLog('info', '\n--- TESTE 5: HEALTH ENDPOINT ---');
+      addLog('info', '\n--- TESTE 8: HEALTH ENDPOINT ---');
       const healthUrl = `${baseUrl}${prefix}/health`;
       addLog('request', `GET ${healthUrl}`);
       
@@ -458,7 +517,7 @@ export default function DebugAuthScreen() {
       
       addLog('success', `✅ Health OK: ${JSON.stringify(healthResult.json)}`);
 
-      addLog('info', '\n--- TESTE 6: PROBE DO TRPC ---');
+      addLog('info', '\n--- TESTE 9: PROBE DO TRPC ---');
       const trpcProbeUrl = `${baseUrl}${prefix}/trpc/__probe`;
       addLog('request', `GET ${trpcProbeUrl}`);
       
@@ -477,7 +536,7 @@ export default function DebugAuthScreen() {
         addLog('success', `✅ Probe OK: ${JSON.stringify(probeData)}`);
       }
 
-      addLog('info', '\n--- TESTE 7: DEBUG ROUTES (Verificar Procedures) ---');
+      addLog('info', '\n--- TESTE 10: DEBUG ROUTES (Verificar Procedures) ---');
       const trpcRoutesUrl = `${baseUrl}${prefix}/__trpc_routes`;
       addLog('request', `GET ${trpcRoutesUrl}`);
       
@@ -506,13 +565,13 @@ export default function DebugAuthScreen() {
         addLog('info', `Todas procedures: ${JSON.stringify(routesData.procedures, null, 2)}`);
       }
 
-      addLog('info', '\n--- TESTE 8: tRPC CONFIGURATION ---');
+      addLog('info', '\n--- TESTE 11: tRPC CONFIGURATION ---');
       const finalTrpcUrl = getTrpcUrl();
       addLog('info', `URL FINAL DO tRPC: ${finalTrpcUrl}`);
       addLog('info', `Montagem: \${baseUrl}\${prefix}/trpc`);
       addLog('info', `Resultado: ${finalTrpcUrl}`);
       
-      addLog('info', '\n--- TESTE 9: tRPC ensureSeeds (FETCH RAW) ---');
+      addLog('info', '\n--- TESTE 12: tRPC ensureSeeds (FETCH RAW) ---');
       const ensureSeedsUrl = `${finalTrpcUrl}/users.ensureSeeds`;
       addLog('request', `POST ${ensureSeedsUrl}`);
       
@@ -528,6 +587,7 @@ export default function DebugAuthScreen() {
         addLog('error', `❌ ensureSeeds falhou: ${ensureSeedsResult.status}`);
         addLog('error', `Content-Type: ${ensureSeedsResult.contentType}`);
         addLog('error', `Body: ${ensureSeedsResult.text}`);
+        setBackendStatus('⚠️ Backend OK, mas tRPC com problemas');
       } else {
         const seedResult = ensureSeedsResult.json;
         addLog('response', 'Seeds result recebido', seedResult);
@@ -536,7 +596,7 @@ export default function DebugAuthScreen() {
         setBackendStatus('✅ Backend Online & tRPC OK');
       }
       
-      addLog('success', '\n✅ TODAS AS VERIFICAÇÕES CONCLUÍDAS COM SUCESSO');
+      addLog('success', '\n✅ VERIFICAÇÃO COMPLETA FINALIZADA');
     } catch (error: any) {
       addLog('error', '\n❌❌❌ ERRO COMPLETO DO BACKEND ❌❌❌');
       addLog('error', `Tipo: ${error?.constructor?.name || error?.name || 'Unknown'}`);

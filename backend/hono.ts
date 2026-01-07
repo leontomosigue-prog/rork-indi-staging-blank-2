@@ -130,7 +130,15 @@ app.get('/__whoami', (c) => c.json({
   id: BACKEND_ID, 
   version: BACKEND_VERSION, 
   buildTimestamp: BUILD_TIMESTAMP,
-  at: new Date().toISOString()
+  at: new Date().toISOString(),
+  features: {
+    diagGet: true,
+    diagPost: true,
+    trpcRaw: true,
+    postcheck: true,
+    trpcRoutes: true,
+    trpcProbe: true,
+  }
 }));
 
 app.get('/ping', (c) => c.json({ 
@@ -175,6 +183,28 @@ function listProceduresRecursive(router: any, prefix = ''): string[] {
   return procedures;
 }
 
+api.get('/__diag', (c) => {
+  return c.json({
+    ok: true,
+    id: BACKEND_ID,
+    version: BACKEND_VERSION,
+    buildTimestamp: BUILD_TIMESTAMP,
+    at: new Date().toISOString(),
+    message: 'Diagnostic endpoint (GET)',
+  });
+});
+
+api.post('/__diag_post', (c) => {
+  return c.json({
+    ok: true,
+    id: BACKEND_ID,
+    version: BACKEND_VERSION,
+    buildTimestamp: BUILD_TIMESTAMP,
+    at: new Date().toISOString(),
+    message: 'Diagnostic endpoint (POST)',
+  });
+});
+
 api.post('/postcheck', (c) => {
   return c.json({
     ok: true,
@@ -205,6 +235,17 @@ api.get('/__trpc_routes', (c) => {
       stack: error.stack,
     }, 500);
   }
+});
+
+api.post('/trpc/__raw', (c) => {
+  return c.json({
+    ok: true,
+    id: BACKEND_ID,
+    version: BACKEND_VERSION,
+    buildTimestamp: BUILD_TIMESTAMP,
+    at: new Date().toISOString(),
+    message: 'tRPC path raw test (POST outside tRPC handler)',
+  });
 });
 
 api.get('/trpc/__probe', (c) => {
