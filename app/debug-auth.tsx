@@ -281,6 +281,7 @@ export default function DebugAuthScreen() {
     hasCheckedRef.current = true;
     const newTraceId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     setTraceId(newTraceId);
+    (globalThis as any).__DEBUG_TRACE_ID = newTraceId;
     setBackendStatus('🔄 Verificando...');
     setLastError('');
     setLastResult('');
@@ -442,7 +443,50 @@ export default function DebugAuthScreen() {
         });
       }
 
-      addLog('info', '\n--- TESTE 5: DEBUG ROUTES (Verificar Procedures) ---');
+      addLog('info', '\n--- TESTE 5: PROBE DO TRPC ---');
+      const trpcProbeUrl = `${baseUrl}${prefix}/trpc/__probe`;
+      addLog('request', `GET ${trpcProbeUrl}`);
+      
+      const probeResult = await safeFetch(trpcProbeUrl, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json',
+          ...(process.env.SAFE_MODE_DEBUG === '1' || __DEV__ ? { 'x-debug-trace-id': newTraceId } : {}),
+        },
+      });
+      
+      if (probeResult.status === 404) {
+        addLog('error', '❌ /trpc/__probe não existe (backend não foi atualizado)');
+        addLog('error', `URL tentada: ${trpcProbeUrl}`);
+        addLog('error', `Status: ${probeResult.status}`);
+        addLog('error', `Content-Type: ${probeResult.contentType}`);
+        addLog('error', `Body: ${probeResult.text}`);
+      } else if (!probeResult.ok || !probeResult.json) {
+        addLog('error', `❌ Falha no probe: ${probeResult.status} - ${probeResult.text}`);
+      } else {
+        const probeData = probeResult.json;
+        addLog('success', `✅ Probe OK: ${JSON.stringify(probeData)}`);
+      }
+      
+      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
+        addDetailedRequest({
+          traceId: newTraceId,
+          testName: 'Probe do tRPC',
+          timestamp: new Date().toISOString(),
+          method: 'GET',
+          url: trpcProbeUrl,
+          headers: { 'Accept': 'application/json', 'x-debug-trace-id': newTraceId },
+          durationMs: probeResult.durationMs,
+          responseStatus: probeResult.status,
+          responseHeaders: {
+            'content-type': probeResult.contentType,
+          },
+          responseBodyRaw: probeResult.text,
+          parseResult: probeResult.parseResult,
+        });
+      }
+
+      addLog('info', '\n--- TESTE 6: DEBUG ROUTES (Verificar Procedures) ---');
       const trpcRoutesUrl = `${baseUrl}${prefix}/__trpc_routes`;
       addLog('request', `GET ${trpcRoutesUrl}`);
       
@@ -495,13 +539,13 @@ export default function DebugAuthScreen() {
         });
       }
 
-      addLog('info', '\n--- TESTE 6: tRPC CONFIGURATION ---');
+      addLog('info', '\n--- TESTE 7: tRPC CONFIGURATION ---');
       const finalTrpcUrl = getTrpcUrl();
       addLog('info', `URL FINAL DO tRPC: ${finalTrpcUrl}`);
       addLog('info', `Montagem: \${baseUrl}\${prefix}/trpc`);
       addLog('info', `Resultado: ${finalTrpcUrl}`);
       
-      addLog('info', '\n--- TESTE 7: tRPC ensureSeeds ---');
+      addLog('info', '\n--- TESTE 8: tRPC ensureSeeds ---');
       const ensureSeedsUrl = `${finalTrpcUrl}/users.ensureSeeds`;
       addLog('request', `POST ${ensureSeedsUrl}`);
       

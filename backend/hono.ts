@@ -143,12 +143,61 @@ app.get('/health', (c) => c.json({
 
 app.get('/', (c) => c.json({ message: 'Hello World1' }));
 
+function listProceduresRecursive(router: any, prefix = ''): string[] {
+  const procedures: string[] = [];
+  
+  if (!router || !router._def) {
+    return procedures;
+  }
+  
+  const record = router._def.record || router._def.procedures || {};
+  
+  for (const [key, value] of Object.entries(record)) {
+    const fullPath = prefix ? `${prefix}.${key}` : key;
+    
+    if (value && typeof value === 'object') {
+      const valueDef = (value as any)._def;
+      
+      if (valueDef?.type && ['query', 'mutation', 'subscription'].includes(valueDef.type)) {
+        procedures.push(fullPath);
+      } else if (valueDef?.record || valueDef?.procedures) {
+        procedures.push(...listProceduresRecursive(value, fullPath));
+      }
+    }
+  }
+  
+  return procedures;
+}
+
 api.get('/__trpc_routes', (c) => {
-  const procedures = Object.keys((appRouter as any)._def?.procedures ?? {}).sort();
+  try {
+    const procedures = listProceduresRecursive(appRouter).sort();
+    return c.json({
+      ok: true,
+      id: BACKEND_ID,
+      version: BACKEND_VERSION,
+      buildTimestamp: BUILD_TIMESTAMP,
+      count: procedures.length,
+      procedures,
+      at: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    return c.json({
+      ok: false,
+      error: error.message,
+      stack: error.stack,
+    }, 500);
+  }
+});
+
+api.get('/trpc/__probe', (c) => {
   return c.json({
     ok: true,
-    count: procedures.length,
-    procedures,
+    id: BACKEND_ID,
+    version: BACKEND_VERSION,
+    buildTimestamp: BUILD_TIMESTAMP,
+    at: new Date().toISOString(),
+    message: 'tRPC endpoint is alive',
   });
 });
 

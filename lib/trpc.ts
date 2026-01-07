@@ -126,12 +126,14 @@ export const trpcClient = trpc.createClient({
         const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || __DEV__;
         const startTime = Date.now();
         const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const traceId = (globalThis as any).__DEBUG_TRACE_ID;
         
         if (shouldLog) {
           console.log('═══════════════════════════════════════');
           console.log('🔵 tRPC REQUEST');
           console.log('═══════════════════════════════════════');
           console.log('Request ID:', requestId);
+          console.log('Trace ID:', traceId || 'none');
           console.log('Timestamp:', new Date().toISOString());
           console.log('Method:', options?.method || 'GET');
           console.log('URL:', url);
@@ -158,6 +160,7 @@ export const trpcClient = trpc.createClient({
           headers: {
             ...options?.headers,
             ...(shouldLog ? { 'x-debug-request-id': requestId } : {}),
+            ...(traceId ? { 'x-debug-trace-id': traceId } : {}),
           },
         };
         
@@ -170,19 +173,26 @@ export const trpcClient = trpc.createClient({
             console.log('🟢 tRPC RESPONSE');
             console.log('═══════════════════════════════════════');
             console.log('Request ID:', requestId);
+            console.log('Trace ID:', traceId || 'none');
             console.log('Duration:', durationMs, 'ms');
             console.log('Status:', response.status, response.statusText);
             console.log('Content-Type:', response.headers.get('content-type'));
             console.log('Content-Length:', response.headers.get('content-length'));
+            console.log('x-freestyle-deployment-id:', response.headers.get('x-freestyle-deployment-id') || 'none');
+            console.log('x-debug-trace-id:', response.headers.get('x-debug-trace-id') || 'none');
+            console.log('x-debug-request-id:', response.headers.get('x-debug-request-id') || 'none');
             
             const clonedResponse = response.clone();
             const bodyText = await clonedResponse.text();
-            const truncated = bodyText.length > 2000 ? bodyText.substring(0, 2000) + '... [TRUNCATED]' : bodyText;
+            const truncated = bodyText.length > 1000 ? bodyText.substring(0, 1000) + '... [TRUNCATED]' : bodyText;
             console.log('Body (', bodyText.length, 'chars):', truncated);
             
-            if (!response.headers.get('content-type')?.includes('application/json')) {
-              console.error('⚠️ Response is NOT JSON! Content-Type:', response.headers.get('content-type'));
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+              console.error('⚠️ Response is NOT JSON! Content-Type:', contentType);
+              console.error('Status:', response.status);
               console.error('Body:', truncated);
+              console.error('x-freestyle-deployment-id:', response.headers.get('x-freestyle-deployment-id') || 'none');
             }
             
             const urlParts = url.toString().split('/trpc/');
