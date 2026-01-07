@@ -61,7 +61,6 @@ export default function DebugAuthScreen() {
   const [lastErrorFull, setLastErrorFull] = useState<string>('');
   const hasCheckedRef = useRef(false);
   
-  const ensureSeedsMutation = trpc.users.ensureSeeds.useMutation();
   const loginMutation = trpc.users.login.useMutation();
 
   const addLog = useCallback((type: LogEntry['type'], message: string, details?: any) => {
@@ -513,30 +512,30 @@ export default function DebugAuthScreen() {
       addLog('info', `Montagem: \${baseUrl}\${prefix}/trpc`);
       addLog('info', `Resultado: ${finalTrpcUrl}`);
       
-      addLog('info', '\n--- TESTE 9: tRPC ensureSeeds ---');
+      addLog('info', '\n--- TESTE 9: tRPC ensureSeeds (FETCH RAW) ---');
       const ensureSeedsUrl = `${finalTrpcUrl}/users.ensureSeeds`;
       addLog('request', `POST ${ensureSeedsUrl}`);
       
-      if (process.env.SAFE_MODE_DEBUG === '1' || __DEV__) {
-        addDetailedRequest({
-          traceId: newTraceId,
-          testName: 'tRPC ensureSeeds',
-          timestamp: new Date().toISOString(),
-          method: 'POST',
-          url: ensureSeedsUrl,
-          trpcUrlBase: finalTrpcUrl,
-          procedure: 'users.ensureSeeds',
-          batch: false,
-          payloadShape: [],
-        });
+      const ensureSeedsResult = await fetchForensics(ensureSeedsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }, 'tRPC ensureSeeds');
+      
+      if (!ensureSeedsResult.ok || !ensureSeedsResult.json) {
+        addLog('error', `❌ ensureSeeds falhou: ${ensureSeedsResult.status}`);
+        addLog('error', `Content-Type: ${ensureSeedsResult.contentType}`);
+        addLog('error', `Body: ${ensureSeedsResult.text}`);
+      } else {
+        const seedResult = ensureSeedsResult.json;
+        addLog('response', 'Seeds result recebido', seedResult);
+        addLog('success', '✅ tRPC ensureSeeds OK');
+        setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
+        setBackendStatus('✅ Backend Online & tRPC OK');
       }
       
-      const seedResult = await ensureSeedsMutation.mutateAsync();
-      addLog('response', 'Seeds result recebido', seedResult);
-      addLog('success', '✅ tRPC ensureSeeds OK');
-      
-      setBackendStatus('✅ Backend Online & tRPC OK');
-      setLastResult(`Seeds: ${JSON.stringify(seedResult)}`);
       addLog('success', '\n✅ TODAS AS VERIFICAÇÕES CONCLUÍDAS COM SUCESSO');
     } catch (error: any) {
       addLog('error', '\n❌❌❌ ERRO COMPLETO DO BACKEND ❌❌❌');
@@ -567,7 +566,7 @@ export default function DebugAuthScreen() {
       setBackendStatus('❌ Backend Error');
       setLastError(`${error?.name || 'Error'}: ${error?.message || String(error)}`);
     }
-  }, [ensureSeedsMutation, addLog, addDetailedRequest, fetchForensics]);
+  }, [addLog, fetchForensics]);
 
   useEffect(() => {
     checkBackend();

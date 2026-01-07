@@ -281,15 +281,24 @@ api.use('/trpc/*', async (c, next) => {
   }
 });
 
-api.use(
+api.all(
   '/trpc/*',
   trpcServer({
     router: appRouter,
     createContext,
-    endpoint: '/trpc',
   })
 );
 
 app.route('/api', api);
+
+app.notFound((c) => {
+  return c.json({
+    ok: false,
+    error: "NOT_FOUND",
+    method: c.req.method,
+    path: c.req.path,
+    message: `Route ${c.req.method} ${c.req.path} not found`,
+  }, 404);
+});
 
 export default app;
