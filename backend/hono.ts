@@ -12,13 +12,12 @@ const BACKEND_VERSION = '1.0.0';
 const BUILD_TIMESTAMP = Date.now();
 
 const app = new Hono();
-const api = new Hono();
 
 console.log('🚀 BACKEND STARTING');
 console.log('   ID:', BACKEND_ID);
 console.log('   Version:', BACKEND_VERSION);
 console.log('   Build Timestamp:', BUILD_TIMESTAMP);
-console.log('   tRPC mounted at: /api/trpc/* (ÚNICO MOUNT)');
+console.log('   tRPC mounted at: /trpc/* (gateway adds /api prefix)');
 
 async function initializeData() {
   console.log('🔧 Initializing backend data...');
@@ -183,7 +182,7 @@ function listProceduresRecursive(router: any, prefix = ''): string[] {
   return procedures;
 }
 
-api.get('/__diag', (c) => {
+app.get('/__diag', (c) => {
   return c.json({
     ok: true,
     id: BACKEND_ID,
@@ -194,7 +193,7 @@ api.get('/__diag', (c) => {
   });
 });
 
-api.post('/__diag_post', (c) => {
+app.post('/__diag_post', (c) => {
   return c.json({
     ok: true,
     id: BACKEND_ID,
@@ -205,7 +204,7 @@ api.post('/__diag_post', (c) => {
   });
 });
 
-api.post('/postcheck', (c) => {
+app.post('/postcheck', (c) => {
   return c.json({
     ok: true,
     id: BACKEND_ID,
@@ -216,7 +215,7 @@ api.post('/postcheck', (c) => {
   });
 });
 
-api.get('/__trpc_routes', (c) => {
+app.get('/__trpc_routes', (c) => {
   try {
     const procedures = listProceduresRecursive(appRouter).sort();
     return c.json({
@@ -237,7 +236,7 @@ api.get('/__trpc_routes', (c) => {
   }
 });
 
-api.post('/trpc/__raw', (c) => {
+app.post('/trpc/__raw', (c) => {
   return c.json({
     ok: true,
     id: BACKEND_ID,
@@ -248,7 +247,7 @@ api.post('/trpc/__raw', (c) => {
   });
 });
 
-api.get('/trpc/__probe', (c) => {
+app.get('/trpc/__probe', (c) => {
   return c.json({
     ok: true,
     id: BACKEND_ID,
@@ -259,23 +258,23 @@ api.get('/trpc/__probe', (c) => {
   });
 });
 
-api.all('/__echo_trpc_path/*', (c) => {
+app.all('/__echo_trpc_path/*', (c) => {
   const url = new URL(c.req.url);
   return c.json({
     method: c.req.method,
     pathname: url.pathname,
-    afterApiTrpc: url.pathname.replace(/^\/api\/trpc\/?/, ''),
-    afterApi: url.pathname.replace(/^\/api\/?/, ''),
+    afterApiTrpc: url.pathname.replace(/^\/trpc\/?/, ''),
+    afterApi: url.pathname.replace(/^\//, ''),
   });
 });
 
-api.use('/trpc/*', async (c, next) => {
+app.use('/trpc/*', async (c, next) => {
   const url = new URL(c.req.url);
   console.log('[TRPC_FORENSIC]', {
     method: c.req.method,
     pathname: url.pathname,
     reqPath: c.req.path,
-    computedAfterApiTrpc: url.pathname.replace(/^\/api\/trpc\/?/, ''),
+    computedAfterTrpc: url.pathname.replace(/^\/trpc\/?/, ''),
   });
 
   const shouldLog = process.env.SAFE_MODE_DEBUG === '1' || process.env.NODE_ENV === 'development';
@@ -322,15 +321,13 @@ api.use('/trpc/*', async (c, next) => {
   }
 });
 
-api.all(
+app.all(
   '/trpc/*',
   trpcServer({
     router: appRouter,
     createContext,
   })
 );
-
-app.route('/api', api);
 
 app.notFound((c) => {
   return c.json({
