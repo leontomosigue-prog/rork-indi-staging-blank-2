@@ -10,9 +10,12 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Image,
+  Platform,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { Plus, Edit2, Trash2, User } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, User, Camera, X } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -24,6 +27,7 @@ interface EmployeeFormData {
   fullName: string;
   roles: Role[];
   password: string;
+  photoUri: string;
 }
 
 const AVAILABLE_ROLES: { value: Role; label: string }[] = [
@@ -52,13 +56,14 @@ export default function EmployeesScreen() {
     fullName: '',
     roles: [],
     password: '',
+    photoUri: '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
   const isAdmin = user?.roles?.includes('Admin');
 
   const resetForm = () => {
-    setFormData({ email: '', fullName: '', roles: [], password: '' });
+    setFormData({ email: '', fullName: '', roles: [], password: '', photoUri: '' });
     setEditingId(null);
   };
 
@@ -70,11 +75,61 @@ export default function EmployeesScreen() {
         fullName: employee.fullName,
         roles: employee.roles || [],
         password: '',
+        photoUri: (employee as any).photoUri ?? '',
       });
     } else {
       resetForm();
     }
     setIsModalVisible(true);
+  };
+
+  const handlePickPhoto = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de acesso à galeria para selecionar uma foto.');
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setFormData((prev) => ({ ...prev, photoUri: result.assets[0].uri }));
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de acesso à câmera para tirar uma foto.');
+        return;
+      }
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setFormData((prev) => ({ ...prev, photoUri: result.assets[0].uri }));
+    }
+  };
+
+  const handlePhotoOptions = () => {
+    if (Platform.OS === 'web') {
+      void handlePickPhoto();
+      return;
+    }
+    Alert.alert('Foto do Colaborador', 'Escolha uma opção', [
+      { text: 'Câmera', onPress: handleTakePhoto },
+      { text: 'Galeria', onPress: handlePickPhoto },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
   };
 
   const handleToggleRole = (role: Role) => {
@@ -119,6 +174,7 @@ export default function EmployeesScreen() {
           const result = await atualizarColaborador(editingId, {
             fullName: formData.fullName,
             roles: formData.roles,
+            ...(formData.photoUri ? { photoUri: formData.photoUri } : {}),
           });
           if (!result) throw new Error('Falha ao atualizar');
         }
@@ -129,6 +185,7 @@ export default function EmployeesScreen() {
             fullName: formData.fullName,
             roles: formData.roles,
             password: formData.password,
+            ...(formData.photoUri ? { photoUri: formData.photoUri } : {}),
           });
           if (!result) throw new Error('Falha ao criar');
         }
@@ -175,7 +232,11 @@ export default function EmployeesScreen() {
     <View style={styles.employeeCard}>
       <View style={styles.employeeInfo}>
         <View style={styles.avatarContainer}>
-          <User size={24} color={Colors.primary} />
+          {(item as any).photoUri ? (
+            <Image source={{ uri: (item as any).photoUri }} style={styles.avatarImage} />
+          ) : (
+            <User size={24} color={Colors.primary} />
+          )}
         </View>
         <View style={styles.employeeDetails}>
           <Text style={styles.employeeName}>{item.fullName}</Text>
@@ -280,7 +341,36 @@ export default function EmployeesScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.form}>
+          <ScrollView style={styles.form} contentContainerStyle={styles.formContent}>
+            <View style={styles.photoSection}>
+              <TouchableOpacity
+                style={styles.photoPickerButton}
+                onPress={handlePhotoOptions}
+                activeOpacity={0.7}
+              >
+                {formData.photoUri ? (
+                  <Image source={{ uri: formData.photoUri }} style={styles.photoPreview} />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Camera size={32} color={Colors.textSecondary} />
+                    <Text style={styles.photoPlaceholderText}>Adicionar foto</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {formData.photoUri ? (
+                <TouchableOpacity
+                  style={styles.removePhotoButton}
+                  onPress={() => setFormData((prev) => ({ ...prev, photoUri: '' }))}
+                  activeOpacity={0.7}
+                >
+                  <X size={14} color="#fff" />
+                  <Text style={styles.removePhotoText}>Remover foto</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.photoHint}>Opcional</Text>
+              )}
+            </View>
+
             <Text style={styles.label}>E-mail</Text>
             <TextInput
               style={styles.input}
@@ -408,6 +498,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    overflow: 'hidden' as const,
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   employeeDetails: {
     flex: 1,
@@ -493,7 +589,61 @@ const styles = StyleSheet.create({
   },
   form: {
     flex: 1,
+  },
+  formContent: {
     padding: 16,
+    paddingBottom: 32,
+  },
+  photoSection: {
+    alignItems: 'center' as const,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  photoPickerButton: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    overflow: 'hidden' as const,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderStyle: 'dashed' as const,
+    backgroundColor: Colors.cardBackground,
+  },
+  photoPreview: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+  },
+  photoPlaceholder: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  photoPlaceholderText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center' as const,
+  },
+  photoHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 6,
+  },
+  removePhotoButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    marginTop: 10,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  removePhotoText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500' as const,
   },
   label: {
     fontSize: 14,
@@ -547,7 +697,6 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center' as const,
     marginTop: 24,
-    marginBottom: 32,
   },
   submitButtonDisabled: {
     opacity: 0.6,
