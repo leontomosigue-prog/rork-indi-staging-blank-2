@@ -48,6 +48,11 @@ interface MachineType {
 
 const MACHINE_TYPES: MachineType[] = [
   {
+    id: 'nao_sei',
+    label: 'Não tenho certeza',
+    image: 'https://images.unsplash.com/photo-1633613286991-611fe299c4be?w=120&h=120&fit=crop&q=80',
+  },
+  {
     id: 'paleteira',
     label: 'Paleteira',
     image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=120&h=120&fit=crop&q=80',
