@@ -90,6 +90,7 @@ export default function RegisterScreen() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingCEP, setIsFetchingCEP] = useState(false);
+  const [isFetchingCNPJ, setIsFetchingCNPJ] = useState(false);
 
   const updateField = useCallback((field: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -97,6 +98,35 @@ export default function RegisterScreen() {
       setErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
     }
   }, [errors]);
+
+  const handleCNPJChange = useCallback(async (raw: string) => {
+    const formatted = formatCNPJ(raw);
+    updateField('cnpj', formatted);
+
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 14) {
+      setIsFetchingCNPJ(true);
+      console.log('Register: fetching CNPJ', digits);
+      try {
+        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+        if (!res.ok) {
+          setErrors(prev => ({ ...prev, cnpj: 'CNPJ não encontrado' }));
+        } else {
+          const data = await res.json() as { razao_social?: string; nome_fantasia?: string; situacao_cadastral?: string };
+          setForm(prev => ({
+            ...prev,
+            razaoSocial: data.razao_social ?? prev.razaoSocial,
+          }));
+          console.log('Register: CNPJ fetched successfully', data);
+        }
+      } catch (e) {
+        console.log('Register: CNPJ fetch error', e);
+        setErrors(prev => ({ ...prev, cnpj: 'Erro ao buscar CNPJ' }));
+      } finally {
+        setIsFetchingCNPJ(false);
+      }
+    }
+  }, [updateField]);
 
   const handleCEPChange = useCallback(async (raw: string) => {
     const formatted = formatCEP(raw);
@@ -224,10 +254,11 @@ export default function RegisterScreen() {
             label="CNPJ"
             placeholder="00.000.000/0000-00"
             value={form.cnpj}
-            onChangeText={v => updateField('cnpj', formatCNPJ(v))}
+            onChangeText={handleCNPJChange}
             keyboardType="numeric"
             error={errors.cnpj}
             testID="input-cnpj"
+            rightElement={isFetchingCNPJ ? <ActivityIndicator size="small" color="#FF0000" /> : undefined}
           />
           <Field
             label="Razão Social"
