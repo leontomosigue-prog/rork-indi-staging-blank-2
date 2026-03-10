@@ -82,7 +82,7 @@ export default function RentalScreen() {
   } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCustomRequestVisible, setIsCustomRequestVisible] = useState(false);
-  const [isMachineTypePickerVisible, setIsMachineTypePickerVisible] = useState(false);
+  const [isMachineTypePickerOpen, setIsMachineTypePickerOpen] = useState(false);
   const [editingOffer, setEditingOffer] = useState<string | null>(null);
   const [formData, setFormData] = useState<RentalFormData>({
     nome: '',
@@ -415,53 +415,6 @@ export default function RentalScreen() {
         }
       />
 
-      {/* Machine Type Picker Modal */}
-      <Modal
-        visible={isMachineTypePickerVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setIsMachineTypePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.pickerOverlay}
-          activeOpacity={1}
-          onPress={() => setIsMachineTypePickerVisible(false)}
-        >
-          <View style={styles.pickerSheet}>
-            <View style={styles.pickerHandle} />
-            <Text style={styles.pickerTitle}>Selecione o tipo de máquina</Text>
-            {MACHINE_TYPES.map((type) => {
-              const isSelected = customForm.tipoMaquina === type.id;
-              return (
-                <TouchableOpacity
-                  key={type.id}
-                  style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                  onPress={() => {
-                    setCustomForm({ ...customForm, tipoMaquina: type.id });
-                    setIsMachineTypePickerVisible(false);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Image
-                    source={{ uri: type.image }}
-                    style={styles.pickerOptionImage}
-                    contentFit="cover"
-                  />
-                  <Text style={[styles.pickerOptionLabel, isSelected && styles.pickerOptionLabelSelected]}>
-                    {type.label}
-                  </Text>
-                  {isSelected && (
-                    <View style={styles.pickerCheckWrap}>
-                      <Check size={16} color={Colors.area.locacao} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* Custom Request Modal */}
       <Modal
         visible={isCustomRequestVisible}
@@ -493,8 +446,8 @@ export default function RentalScreen() {
 
             <Text style={styles.label}>Tipo de máquina <Text style={styles.required}>*</Text></Text>
             <TouchableOpacity
-              style={styles.machineSelector}
-              onPress={() => setIsMachineTypePickerVisible(true)}
+              style={[styles.machineSelector, isMachineTypePickerOpen && styles.machineSelectorOpen]}
+              onPress={() => setIsMachineTypePickerOpen((v) => !v)}
               activeOpacity={0.8}
             >
               {selectedMachineType ? (
@@ -509,8 +462,40 @@ export default function RentalScreen() {
               ) : (
                 <Text style={styles.machineSelectorPlaceholder}>Selecione o tipo de máquina...</Text>
               )}
-              <ChevronDown size={18} color={Colors.textLight} />
+              <ChevronDown size={18} color={isMachineTypePickerOpen ? Colors.area.locacao : Colors.textLight} />
             </TouchableOpacity>
+            {isMachineTypePickerOpen && (
+              <View style={styles.inlinePickerList}>
+                {MACHINE_TYPES.map((type) => {
+                  const isSelected = customForm.tipoMaquina === type.id;
+                  return (
+                    <TouchableOpacity
+                      key={type.id}
+                      style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                      onPress={() => {
+                        setCustomForm({ ...customForm, tipoMaquina: type.id });
+                        setIsMachineTypePickerOpen(false);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Image
+                        source={{ uri: type.image }}
+                        style={styles.pickerOptionImage}
+                        contentFit="cover"
+                      />
+                      <Text style={[styles.pickerOptionLabel, isSelected && styles.pickerOptionLabelSelected]}>
+                        {type.label}
+                      </Text>
+                      {isSelected && (
+                        <View style={styles.pickerCheckWrap}>
+                          <Check size={16} color={Colors.area.locacao} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             <Text style={styles.label}>Capacidade de carga</Text>
             <TextInput
@@ -1007,38 +992,25 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     fontWeight: '500' as const,
   },
+  machineSelectorOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderColor: Colors.area.locacao,
+  },
   machineSelectorPlaceholder: {
     fontSize: 15,
     color: Colors.textLight,
     flex: 1,
   },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end' as const,
-  },
-  pickerSheet: {
+  inlinePickerList: {
+    borderWidth: 1,
+    borderColor: Colors.area.locacao,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
     backgroundColor: Colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 36,
-    paddingTop: 12,
-  },
-  pickerHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.lightBorder,
-    alignSelf: 'center' as const,
-    marginBottom: 16,
-  },
-  pickerTitle: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: Colors.textDark,
-    marginBottom: 16,
-    textAlign: 'center' as const,
+    overflow: 'hidden' as const,
+    marginTop: -2,
   },
   pickerOption: {
     flexDirection: 'row' as const,
