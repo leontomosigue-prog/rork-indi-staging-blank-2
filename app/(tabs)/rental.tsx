@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList, ChevronDown, Camera, Check } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -35,7 +37,37 @@ interface CustomRequestFormData {
   dataInicio: string;
   dataFim: string;
   descricao: string;
+  localImages: string[];
 }
+
+interface MachineType {
+  id: string;
+  label: string;
+  image: string;
+}
+
+const MACHINE_TYPES: MachineType[] = [
+  {
+    id: 'paleteira',
+    label: 'Paleteira',
+    image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=120&h=120&fit=crop&q=80',
+  },
+  {
+    id: 'transpaleteira',
+    label: 'Transpaleteira',
+    image: 'https://images.unsplash.com/photo-1553413077-190dd305871c?w=120&h=120&fit=crop&q=80',
+  },
+  {
+    id: 'empilhadeira',
+    label: 'Empilhadeira',
+    image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=120&h=120&fit=crop&q=80',
+  },
+  {
+    id: 'retrátil',
+    label: 'Retrátil',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=120&h=120&fit=crop&q=80',
+  },
+];
 
 export default function RentalScreen() {
   const { user } = useAuth();
@@ -50,6 +82,7 @@ export default function RentalScreen() {
   } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCustomRequestVisible, setIsCustomRequestVisible] = useState(false);
+  const [isMachineTypePickerVisible, setIsMachineTypePickerVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState<string | null>(null);
   const [formData, setFormData] = useState<RentalFormData>({
     nome: '',
@@ -66,6 +99,7 @@ export default function RentalScreen() {
     dataInicio: '',
     dataFim: '',
     descricao: '',
+    localImages: [],
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
@@ -91,6 +125,7 @@ export default function RentalScreen() {
       dataInicio: '',
       dataFim: '',
       descricao: '',
+      localImages: [],
     });
   };
 
@@ -197,6 +232,37 @@ export default function RentalScreen() {
     }
   };
 
+  const handlePickImages = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Indisponível', 'O envio de imagens não está disponível na versão web. Use o app mobile.');
+      return;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Precisamos de acesso à sua galeria para adicionar fotos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      selectionLimit: 5,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const newUris = result.assets.map((a) => a.uri);
+      const combined = [...customForm.localImages, ...newUris].slice(0, 5);
+      setCustomForm({ ...customForm, localImages: combined });
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const updated = customForm.localImages.filter((_, i) => i !== index);
+    setCustomForm({ ...customForm, localImages: updated });
+  };
+
   const handleSubmitCustomRequest = async () => {
     if (!customForm.tipoMaquina || !customForm.dataInicio || !customForm.dataFim) {
       Alert.alert('Campos obrigatórios', 'Preencha pelo menos o tipo de máquina e o período desejado.');
@@ -210,6 +276,7 @@ export default function RentalScreen() {
         `Capacidade de carga: ${customForm.capacidadeCarga || 'Não informado'}\n` +
         `Elevação necessária: ${customForm.elevacaoNecessaria || 'Não informado'}\n` +
         `Período: ${customForm.dataInicio} até ${customForm.dataFim}\n` +
+        `Fotos do local/carga: ${customForm.localImages.length > 0 ? `${customForm.localImages.length} imagem(ns) anexada(s)` : 'Nenhuma'}\n` +
         `\nDescrição / Observações:\n${customForm.descricao || 'Sem observações'}`;
 
       const conversaId = await criarConversa({
@@ -232,6 +299,8 @@ export default function RentalScreen() {
       setIsSubmittingCustom(false);
     }
   };
+
+  const selectedMachineType = MACHINE_TYPES.find((m) => m.id === customForm.tipoMaquina);
 
   const renderOffer = ({ item }: any) => (
     <View style={styles.offerCard}>
@@ -346,6 +415,53 @@ export default function RentalScreen() {
         }
       />
 
+      {/* Machine Type Picker Modal */}
+      <Modal
+        visible={isMachineTypePickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsMachineTypePickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setIsMachineTypePickerVisible(false)}
+        >
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.pickerTitle}>Selecione o tipo de máquina</Text>
+            {MACHINE_TYPES.map((type) => {
+              const isSelected = customForm.tipoMaquina === type.id;
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                  onPress={() => {
+                    setCustomForm({ ...customForm, tipoMaquina: type.id });
+                    setIsMachineTypePickerVisible(false);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Image
+                    source={{ uri: type.image }}
+                    style={styles.pickerOptionImage}
+                    contentFit="cover"
+                  />
+                  <Text style={[styles.pickerOptionLabel, isSelected && styles.pickerOptionLabelSelected]}>
+                    {type.label}
+                  </Text>
+                  {isSelected && (
+                    <View style={styles.pickerCheckWrap}>
+                      <Check size={16} color={Colors.area.locacao} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Custom Request Modal */}
       <Modal
         visible={isCustomRequestVisible}
@@ -376,13 +492,25 @@ export default function RentalScreen() {
             </Text>
 
             <Text style={styles.label}>Tipo de máquina <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              value={customForm.tipoMaquina}
-              onChangeText={(t) => setCustomForm({ ...customForm, tipoMaquina: t })}
-              placeholder="Ex: Empilhadeira elétrica, Reach Stacker..."
-              placeholderTextColor={Colors.textLight}
-            />
+            <TouchableOpacity
+              style={styles.machineSelector}
+              onPress={() => setIsMachineTypePickerVisible(true)}
+              activeOpacity={0.8}
+            >
+              {selectedMachineType ? (
+                <View style={styles.machineSelectorSelected}>
+                  <Image
+                    source={{ uri: selectedMachineType.image }}
+                    style={styles.machineSelectorImage}
+                    contentFit="cover"
+                  />
+                  <Text style={styles.machineSelectorText}>{selectedMachineType.label}</Text>
+                </View>
+              ) : (
+                <Text style={styles.machineSelectorPlaceholder}>Selecione o tipo de máquina...</Text>
+              )}
+              <ChevronDown size={18} color={Colors.textLight} />
+            </TouchableOpacity>
 
             <Text style={styles.label}>Capacidade de carga</Text>
             <TextInput
@@ -444,6 +572,55 @@ export default function RentalScreen() {
               numberOfLines={5}
               textAlignVertical="top"
             />
+
+            {/* Image Upload Section */}
+            <Text style={styles.label}>
+              Fotos do local e da carga{' '}
+              <Text style={styles.optionalTag}>(opcional)</Text>
+            </Text>
+            <Text style={styles.imageUploadNote}>
+              Adicione até 5 fotos para nos ajudar a entender melhor suas necessidades.
+            </Text>
+
+            {customForm.localImages.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.imagePreviewScroll}
+                contentContainerStyle={styles.imagePreviewRow}
+              >
+                {customForm.localImages.map((uri, index) => (
+                  <View key={index} style={styles.imageThumbWrap}>
+                    <Image
+                      source={{ uri }}
+                      style={styles.imageThumb}
+                      contentFit="cover"
+                    />
+                    <TouchableOpacity
+                      style={styles.imageThumbRemove}
+                      onPress={() => handleRemoveImage(index)}
+                    >
+                      <X size={12} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {customForm.localImages.length < 5 && (
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={handlePickImages}
+                activeOpacity={0.8}
+              >
+                <Camera size={20} color={Colors.area.locacao} />
+                <Text style={styles.imagePickerButtonText}>
+                  {customForm.localImages.length === 0
+                    ? 'Adicionar fotos'
+                    : `Adicionar mais fotos (${customForm.localImages.length}/5)`}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[styles.submitButton, isSubmittingCustom && styles.submitButtonDisabled]}
@@ -788,6 +965,13 @@ const styles = StyleSheet.create({
   required: {
     color: Colors.primary,
   },
+  optionalTag: {
+    fontSize: 11,
+    fontWeight: '400' as const,
+    color: Colors.textLight,
+    textTransform: 'none' as const,
+    letterSpacing: 0,
+  },
   input: {
     backgroundColor: Colors.lightSurface,
     borderRadius: 10,
@@ -796,6 +980,104 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     borderWidth: 1,
     borderColor: Colors.lightBorder,
+  },
+  machineSelector: {
+    backgroundColor: Colors.lightSurface,
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.lightBorder,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  machineSelectorSelected: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    flex: 1,
+  },
+  machineSelectorImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+  },
+  machineSelectorText: {
+    fontSize: 15,
+    color: Colors.textDark,
+    fontWeight: '500' as const,
+  },
+  machineSelectorPlaceholder: {
+    fontSize: 15,
+    color: Colors.textLight,
+    flex: 1,
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end' as const,
+  },
+  pickerSheet: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 36,
+    paddingTop: 12,
+  },
+  pickerHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.lightBorder,
+    alignSelf: 'center' as const,
+    marginBottom: 16,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: Colors.textDark,
+    marginBottom: 16,
+    textAlign: 'center' as const,
+  },
+  pickerOption: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.lightBorder,
+    backgroundColor: Colors.lightSurface,
+  },
+  pickerOptionSelected: {
+    borderColor: Colors.area.locacao,
+    backgroundColor: 'rgba(59,130,246,0.06)',
+  },
+  pickerOptionImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+  },
+  pickerOptionLabel: {
+    fontSize: 16,
+    fontWeight: '500' as const,
+    color: Colors.textDark,
+    flex: 1,
+  },
+  pickerOptionLabelSelected: {
+    color: Colors.area.locacao,
+    fontWeight: '700' as const,
+  },
+  pickerCheckWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   dateRow: {
     flexDirection: 'row' as const,
@@ -842,6 +1124,54 @@ const styles = StyleSheet.create({
     borderColor: Colors.lightBorder,
     minHeight: 120,
     textAlignVertical: 'top' as const,
+  },
+  imageUploadNote: {
+    fontSize: 12,
+    color: Colors.textLight,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  imagePreviewScroll: {
+    marginBottom: 10,
+  },
+  imagePreviewRow: {
+    gap: 10,
+    paddingRight: 4,
+  },
+  imageThumbWrap: {
+    position: 'relative' as const,
+  },
+  imageThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+  },
+  imageThumbRemove: {
+    position: 'absolute' as const,
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  imagePickerButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.area.locacao,
+    borderStyle: 'dashed' as const,
+    borderRadius: 10,
+    padding: 14,
+    justifyContent: 'center' as const,
+  },
+  imagePickerButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.area.locacao,
   },
   submitButton: {
     backgroundColor: Colors.area.locacao,
