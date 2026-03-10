@@ -1,6 +1,9 @@
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Building2,
+  Camera,
   ChevronLeft,
   MapPin,
   User,
@@ -91,6 +94,25 @@ export default function RegisterScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingCEP, setIsFetchingCEP] = useState(false);
   const [isFetchingCNPJ, setIsFetchingCNPJ] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  const handlePickPhoto = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para adicionar uma foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setPhotoUri(result.assets[0].uri);
+      console.log('Register: photo selected', result.assets[0].uri);
+    }
+  }, []);
 
   const updateField = useCallback((field: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -209,6 +231,23 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.photoSection}>
+            <Pressable style={styles.photoContainer} onPress={handlePickPhoto} testID="photo-picker">
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.photoImage} contentFit="cover" />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Camera size={28} color="rgba(255,255,255,0.4)" />
+                </View>
+              )}
+              <View style={styles.photoBadge}>
+                <Camera size={12} color="#FFFFFF" />
+              </View>
+            </Pressable>
+            <Text style={styles.photoLabel}>Foto de perfil</Text>
+            <Text style={styles.photoHint}>Opcional</Text>
+          </View>
+
           <SectionHeader icon={<User size={16} color="#FF0000" />} title="Dados Pessoais" />
 
           <Field
@@ -486,6 +525,59 @@ const styles = StyleSheet.create({
   loginLinkBold: {
     color: '#FF0000',
     fontWeight: '600' as const,
+  },
+  photoSection: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  photoContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    position: 'relative',
+  },
+  photoImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#FF0000',
+  },
+  photoPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#242424',
+    borderWidth: 2,
+    borderColor: '#333333',
+    borderStyle: 'dashed' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FF0000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#1A1A1A',
+  },
+  photoLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600' as const,
+    marginTop: 10,
+  },
+  photoHint: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 
