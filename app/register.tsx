@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface FormData {
   nome: string;
+  telefone: string;
   cpf: string;
   email: string;
   dataNascimento: string;
@@ -67,6 +68,14 @@ function formatDate(value: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
+function formatTelefone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits.length ? `(${digits}` : digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 function formatCEP(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 5) return digits;
@@ -77,6 +86,7 @@ export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState<FormData>({
     nome: '',
+    telefone: '',
     cpf: '',
     email: '',
     dataNascimento: '',
@@ -257,6 +267,14 @@ export default function RegisterScreen() {
             onChangeText={v => updateField('nome', v)}
             error={errors.nome}
             testID="input-nome"
+          />
+          <Field
+            label="Telefone"
+            placeholder="(00) 00000-0000"
+            value={form.telefone}
+            onChangeText={v => updateField('telefone', formatTelefone(v))}
+            keyboardType="phone-pad"
+            testID="input-telefone"
           />
           <Field
             label="CPF"
