@@ -396,7 +396,9 @@ export default function RentalScreen() {
       </TouchableOpacity>
 
       <View style={styles.filterRow}>
-        <Filter size={14} color={Colors.textLight} style={styles.filterIcon} />
+        <View style={styles.filterIcon}>
+          <Filter size={14} color={Colors.textLight} />
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
           <TouchableOpacity
             style={[styles.filterChip, activeFilter === null && styles.filterChipActive]}
@@ -1202,6 +1204,8 @@ const styles = StyleSheet.create({
   },
   filterIcon: {
     marginRight: 2,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   filterScrollContent: {
     gap: 8,
