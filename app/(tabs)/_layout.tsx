@@ -158,7 +158,7 @@ export default function TabLayout() {
           <Tabs.Screen
             name="sales"
             options={{
-              title: "Vendas",
+              title: "Comprar",
               tabBarIcon: ({ color }) => <ShoppingBag size={24} color={color} />,
             }}
           />
@@ -266,7 +266,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="sales"
         options={{
-          title: "Vendas",
+          title: "Comprar",
           tabBarIcon: ({ color }) => <ShoppingBag size={24} color={color} />,
         }}
       />
