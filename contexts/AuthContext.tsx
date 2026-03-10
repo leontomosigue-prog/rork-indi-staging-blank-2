@@ -18,7 +18,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const seedResponse = await dataGateway.initializeSeeds();
       if (seedResponse.status === 'error') {
         console.error('AuthContext: Failed to initialize seeds:', seedResponse.errorMessage);
-        setError({ ...seedResponse, module: 'auth' });
         setIsInitializing(false);
         endOperation();
         return;
@@ -29,19 +28,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         setUser(autoLoginResponse.data);
         console.log('AuthContext: Auto-login successful:', autoLoginResponse.data?.id);
       } else {
-        console.error('AuthContext: Auto-login failed:', autoLoginResponse.errorMessage);
-        setError({ ...autoLoginResponse, module: 'auth' });
+        console.log('AuthContext: No auto-login, user will see login screen');
       }
 
       setIsInitializing(false);
       endOperation();
     };
 
-    init();
+    void init();
   }, [startOperation, endOperation, setError]);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    console.log('AuthContext: login called');
+    console.log('AuthContext: login called for', email);
     startOperation('login', 'processing_request');
 
     const response = await dataGateway.login(email, password);
@@ -52,6 +50,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return true;
     } else {
       setError({ ...response, module: 'auth' });
+      endOperation();
       return false;
     }
   }, [startOperation, endOperation, setError]);
@@ -76,6 +75,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return true;
     } else {
       setError({ ...response, module: 'auth' });
+      endOperation();
       return false;
     }
   }, [startOperation, endOperation, setError]);
@@ -91,8 +91,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       endOperation();
     } else {
       setError({ ...response, module: 'auth' });
+      endOperation();
     }
   }, [startOperation, endOperation, setError]);
+
+  const loginWithBiometric = useCallback(async () => false, []);
+  const toggleBiometric = useCallback(async () => {}, []);
 
   const updateUser = useCallback(async (updates: Partial<User>): Promise<boolean> => {
     console.log('AuthContext: updateUser called');
@@ -108,6 +112,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return true;
     } else {
       setError({ ...response, module: 'auth' });
+      endOperation();
       return false;
     }
   }, [user, startOperation, endOperation, setError]);
@@ -118,10 +123,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     isAuthenticated: !!user,
     biometricAvailable: false,
     login,
-    loginWithBiometric: async () => false,
+    loginWithBiometric,
     register,
     logout,
     updateUser,
-    toggleBiometric: async () => {},
-  }), [user, isInitializing, login, register, logout, updateUser]);
+    toggleBiometric,
+  }), [user, isInitializing, login, loginWithBiometric, register, logout, updateUser, toggleBiometric]);
 });

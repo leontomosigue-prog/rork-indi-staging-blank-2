@@ -169,6 +169,89 @@ class DataGateway {
   async initializeSeeds(): Promise<ApiResponse<void>> {
     this.logRequest('system', 'initializeSeeds');
     try {
+      const usersString = await AsyncStorage.getItem(STORAGE_KEYS.USERS_DB);
+      if (!usersString || JSON.parse(usersString).length === 0) {
+        console.log('[DataGateway] Seeding users into AsyncStorage...');
+        const seedUsers: User[] = [
+          {
+            id: 'admin_user_001',
+            type: 'employee',
+            email: 'admin@indi.com',
+            fullName: 'Admin INDI',
+            roles: ['Admin', 'Vendas', 'Locação', 'Assistência Técnica', 'Peças'],
+            lgpdConsent: true,
+            lgpdConsentDate: '2025-01-17T00:00:00.000Z',
+            createdAt: '2025-01-17T00:00:00.000Z',
+            updatedAt: '2025-01-17T00:00:00.000Z',
+            _passwordHash: 'admin123',
+          } as User & { _passwordHash: string },
+          {
+            id: 'sales_user_001',
+            type: 'employee',
+            email: 'vendas@indi.com',
+            fullName: 'João Silva (Vendas)',
+            roles: ['Vendas'],
+            lgpdConsent: true,
+            lgpdConsentDate: '2025-01-17T00:00:00.000Z',
+            createdAt: '2025-01-17T00:00:00.000Z',
+            updatedAt: '2025-01-17T00:00:00.000Z',
+            _passwordHash: 'vendas123',
+          } as User & { _passwordHash: string },
+          {
+            id: 'rental_user_001',
+            type: 'employee',
+            email: 'locacao@indi.com',
+            fullName: 'Maria Santos (Locação)',
+            roles: ['Locação'],
+            lgpdConsent: true,
+            lgpdConsentDate: '2025-01-17T00:00:00.000Z',
+            createdAt: '2025-01-17T00:00:00.000Z',
+            updatedAt: '2025-01-17T00:00:00.000Z',
+            _passwordHash: 'locacao123',
+          } as User & { _passwordHash: string },
+          {
+            id: 'tech_user_001',
+            type: 'employee',
+            email: 'tecnico@indi.com',
+            fullName: 'Carlos Oliveira (Técnico)',
+            roles: ['Assistência Técnica'],
+            lgpdConsent: true,
+            lgpdConsentDate: '2025-01-17T00:00:00.000Z',
+            createdAt: '2025-01-17T00:00:00.000Z',
+            updatedAt: '2025-01-17T00:00:00.000Z',
+            _passwordHash: 'tecnico123',
+          } as User & { _passwordHash: string },
+          {
+            id: 'parts_user_001',
+            type: 'employee',
+            email: 'pecas@indi.com',
+            fullName: 'Ana Costa (Peças)',
+            roles: ['Peças'],
+            lgpdConsent: true,
+            lgpdConsentDate: '2025-01-17T00:00:00.000Z',
+            createdAt: '2025-01-17T00:00:00.000Z',
+            updatedAt: '2025-01-17T00:00:00.000Z',
+            _passwordHash: 'pecas123',
+          } as User & { _passwordHash: string },
+          {
+            id: 'client_user_001',
+            type: 'client',
+            email: 'cliente@indi.com',
+            fullName: 'Cliente Teste',
+            roles: [],
+            lgpdConsent: true,
+            lgpdConsentDate: '2025-01-17T00:00:00.000Z',
+            createdAt: '2025-01-17T00:00:00.000Z',
+            updatedAt: '2025-01-17T00:00:00.000Z',
+            _passwordHash: 'cliente123',
+          } as User & { _passwordHash: string },
+        ];
+        await AsyncStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(seedUsers));
+        console.log(`[DataGateway] Seeded ${seedUsers.length} users`);
+      } else {
+        console.log('[DataGateway] Users already exist in AsyncStorage');
+      }
+
       const maquinasString = await AsyncStorage.getItem(STORAGE_KEYS.MAQUINAS);
       if (!maquinasString) {
         const todasMaquinas = [...MOCK_MAQUINAS_VENDAS, ...MOCK_MAQUINAS_LOCACAO];
@@ -192,19 +275,51 @@ class DataGateway {
     this.logRequest('auth', 'login', { email });
     try {
       const usersString = await AsyncStorage.getItem(STORAGE_KEYS.USERS_DB);
-      const users: User[] = usersString ? JSON.parse(usersString) : [];
+      const users: any[] = usersString ? JSON.parse(usersString) : [];
+      
+      console.log(`[DataGateway] login: searching for ${email.toLowerCase()} among ${users.length} users`);
       
       const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
       
       if (!user) {
+        console.log('[DataGateway] login: user not found');
         this.logResponse('auth', 'login', 'error', 'INVALID_CREDENTIALS');
         return { status: 'error', errorCode: 'INVALID_CREDENTIALS', errorMessage: 'E-mail ou senha incorretos' };
       }
 
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, user.id);
+      const storedPassword = user._passwordHash || user.passwordHash || '';
+      console.log(`[DataGateway] login: found user ${user.email}, checking password`);
+      
+      if (storedPassword !== password) {
+        console.log('[DataGateway] login: password mismatch');
+        this.logResponse('auth', 'login', 'error', 'INVALID_CREDENTIALS');
+        return { status: 'error', errorCode: 'INVALID_CREDENTIALS', errorMessage: 'E-mail ou senha incorretos' };
+      }
+
+      const cleanUser: User = {
+        id: user.id,
+        type: user.type || 'employee',
+        email: user.email,
+        fullName: user.fullName || user.name || '',
+        phone: user.phone,
+        birthDate: user.birthDate,
+        cpf: user.cpf,
+        companyName: user.companyName,
+        cnpj: user.cnpj,
+        roles: user.roles || [],
+        profileImageUrl: user.profileImageUrl,
+        lgpdConsent: user.lgpdConsent ?? true,
+        lgpdConsentDate: user.lgpdConsentDate || user.createdAt || new Date().toISOString(),
+        createdAt: user.createdAt || new Date().toISOString(),
+        updatedAt: user.updatedAt || new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, cleanUser.id);
+      console.log(`[DataGateway] login: success for ${cleanUser.email} (${cleanUser.id})`);
       this.logResponse('auth', 'login', 'ok');
-      return { status: 'ok', data: user };
+      return { status: 'ok', data: cleanUser };
     } catch (error) {
+      console.error('[DataGateway] login error:', error);
       this.logResponse('auth', 'login', 'error', 'NETWORK_ERROR');
       return { status: 'error', errorCode: 'NETWORK_ERROR', errorMessage: String(error) };
     }
@@ -215,23 +330,45 @@ class DataGateway {
     try {
       const userId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
       if (!userId) {
+        console.log('[DataGateway] autoLogin: no stored userId');
         this.logResponse('auth', 'autoLogin', 'ok');
         return { status: 'ok', data: null };
       }
 
       const usersString = await AsyncStorage.getItem(STORAGE_KEYS.USERS_DB);
-      const users: User[] = usersString ? JSON.parse(usersString) : [];
-      const user = users.find(u => u.id === userId);
+      const users: any[] = usersString ? JSON.parse(usersString) : [];
+      const raw = users.find(u => u.id === userId);
 
-      if (!user) {
+      if (!raw) {
+        console.log('[DataGateway] autoLogin: userId not found in DB, clearing');
         await AsyncStorage.removeItem(STORAGE_KEYS.USER_ID);
         this.logResponse('auth', 'autoLogin', 'ok');
         return { status: 'ok', data: null };
       }
 
+      const user: User = {
+        id: raw.id,
+        type: raw.type || 'employee',
+        email: raw.email,
+        fullName: raw.fullName || raw.name || '',
+        phone: raw.phone,
+        birthDate: raw.birthDate,
+        cpf: raw.cpf,
+        companyName: raw.companyName,
+        cnpj: raw.cnpj,
+        roles: raw.roles || [],
+        profileImageUrl: raw.profileImageUrl,
+        lgpdConsent: raw.lgpdConsent ?? true,
+        lgpdConsentDate: raw.lgpdConsentDate || raw.createdAt || new Date().toISOString(),
+        createdAt: raw.createdAt || new Date().toISOString(),
+        updatedAt: raw.updatedAt || new Date().toISOString(),
+      };
+
+      console.log(`[DataGateway] autoLogin: restored user ${user.email}`);
       this.logResponse('auth', 'autoLogin', 'ok');
       return { status: 'ok', data: user };
     } catch (error) {
+      console.error('[DataGateway] autoLogin error:', error);
       this.logResponse('auth', 'autoLogin', 'error', 'NETWORK_ERROR');
       return { status: 'error', errorCode: 'NETWORK_ERROR', errorMessage: String(error) };
     }
@@ -268,7 +405,7 @@ class DataGateway {
         return { status: 'error', errorCode: 'EMAIL_EXISTS', errorMessage: 'E-mail já cadastrado' };
       }
 
-      const newUser: User = {
+      const newUserRecord: any = {
         id: Date.now().toString(),
         type: 'client',
         email: data.email,
@@ -277,13 +414,31 @@ class DataGateway {
         birthDate: data.birthDate,
         companyName: data.companyName,
         cnpj: data.cnpj,
+        roles: [],
         lgpdConsent: true,
         lgpdConsentDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        _passwordHash: data.password,
       };
 
-      users.push(newUser);
+      const newUser: User = {
+        id: newUserRecord.id,
+        type: 'client',
+        email: data.email,
+        fullName: data.name,
+        cpf: data.cpf,
+        birthDate: data.birthDate,
+        companyName: data.companyName,
+        cnpj: data.cnpj,
+        roles: [],
+        lgpdConsent: true,
+        lgpdConsentDate: newUserRecord.lgpdConsentDate,
+        createdAt: newUserRecord.createdAt,
+        updatedAt: newUserRecord.updatedAt,
+      };
+
+      users.push(newUserRecord);
       await AsyncStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(users));
       await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, newUser.id);
 
