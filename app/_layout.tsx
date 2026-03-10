@@ -65,11 +65,11 @@ export default function RootLayout() {
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <AppStateProvider>
                         <AuthProvider>
-                            <DataProvider>
-                                <MockDataProvider>
+                            <MockDataProvider>
+                                <DataProvider>
                                     <RootLayoutNav />
-                                </MockDataProvider>
-                            </DataProvider>
+                                </DataProvider>
+                            </MockDataProvider>
                         </AuthProvider>
                     </AppStateProvider>
                 </GestureHandlerRootView>

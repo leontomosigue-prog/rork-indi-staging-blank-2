@@ -205,7 +205,8 @@ const MOCK_MENSAGENS: Mensagem[] = [
 ];
 
 export const [MockDataProvider, useMockData] = createContextHook(() => {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user ?? null;
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
@@ -215,7 +216,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    carregarDados();
+    void carregarDados();
   }, []);
 
   const carregarDados = async () => {
