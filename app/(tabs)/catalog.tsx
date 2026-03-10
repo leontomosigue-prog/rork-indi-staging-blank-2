@@ -52,16 +52,16 @@ const CATEGORIES = [
 export default function CatalogScreen() {
   const { user } = useAuth();
   const {
-    listMaquinas,
-    criarMaquina,
-    atualizarMaquina,
-    removerMaquina,
-    listPecas,
-    criarPeca,
-    atualizarPeca,
-    removerPeca,
-    isLoading,
-  } = useMockData();
+    listMaquinas = () => [],
+    criarMaquina = async () => null,
+    atualizarMaquina = async () => null,
+    removerMaquina = async () => {},
+    listPecas = () => [],
+    criarPeca = async () => null,
+    atualizarPeca = async () => null,
+    removerPeca = async () => {},
+    isLoading = false,
+  } = useMockData() ?? {};
 
   const [activeTab, setActiveTab] = useState<CatalogTab>('vendas');
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -102,7 +102,7 @@ export default function CatalogScreen() {
     setEditingId(null);
   };
 
-  const handleOpenMachineModal = (machine?: any, tipo?: 'venda' | 'locacao') => {
+  const handleOpenMachineModal = (machine?: any, _tipo?: 'venda' | 'locacao') => {
     if (machine) {
       setEditingId(machine.id);
       setMachineFormData({

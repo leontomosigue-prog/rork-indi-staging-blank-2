@@ -30,7 +30,14 @@ interface MachineFormData {
 export default function SalesScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { listMaquinas, criarMaquina, atualizarMaquina, removerMaquina, criarConversa, isLoading } = useMockData();
+  const {
+    listMaquinas = () => [],
+    criarMaquina = async () => null,
+    atualizarMaquina = async () => null,
+    removerMaquina = async () => {},
+    criarConversa = async () => '',
+    isLoading = false,
+  } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMachine, setEditingMachine] = useState<string | null>(null);
   const [formData, setFormData] = useState<MachineFormData>({

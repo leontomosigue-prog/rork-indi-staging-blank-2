@@ -14,7 +14,7 @@ import {
 import { Stack } from 'expo-router';
 import { Plus, Edit2, Trash2, User } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 import type { Role, User as UserType } from '@/types';
 import Logo from '@/components/Logo';
@@ -35,16 +35,15 @@ const AVAILABLE_ROLES: { value: Role; label: string }[] = [
 
 export default function EmployeesScreen() {
   const { user } = useAuth();
-  const employeesQuery = trpc.users.listEmployees.useQuery();
-  const createEmployeeMutation = trpc.users.createEmployee.useMutation({
-    onSuccess: () => employeesQuery.refetch(),
-  });
-  const updateEmployeeMutation = trpc.users.updateEmployee.useMutation({
-    onSuccess: () => employeesQuery.refetch(),
-  });
-  const removeEmployeeMutation = trpc.users.removeEmployee.useMutation({
-    onSuccess: () => employeesQuery.refetch(),
-  });
+  const mockData = useMockData();
+
+  const listColaboradores = mockData?.listColaboradores ?? (() => []);
+  const criarColaborador = mockData?.criarColaborador;
+  const atualizarColaborador = mockData?.atualizarColaborador;
+  const removerColaborador = mockData?.removerColaborador;
+  const isLoading = mockData?.isLoading ?? false;
+
+  const colaboradores = listColaboradores();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -57,32 +56,6 @@ export default function EmployeesScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const isAdmin = user?.roles?.includes('Admin');
-  const isLoading = employeesQuery.isLoading;
-  
-  const colaboradores = (employeesQuery.data || [])
-    .filter((emp: any) => {
-      const hasAdmin = emp.roles?.some((r: string) => r === 'admin');
-      return !hasAdmin;
-    })
-    .map((emp: any) => ({
-      id: emp.id,
-      type: 'employee' as const,
-      email: emp.email,
-      fullName: emp.name,
-      roles: emp.roles?.map((r: string) => {
-        const roleMap: Record<string, Role> = {
-          'sales': 'Vendas',
-          'rental': 'Locação',
-          'technical': 'Assistência Técnica',
-          'parts': 'Peças',
-        };
-        return roleMap[r] || r as Role;
-      }) || [],
-      lgpdConsent: true,
-      lgpdConsentDate: new Date().toISOString(),
-      createdAt: new Date(emp.createdAt).toISOString(),
-      updatedAt: new Date(emp.updatedAt).toISOString(),
-    }));
 
   const resetForm = () => {
     setFormData({ email: '', fullName: '', roles: [], password: '' });
@@ -106,15 +79,9 @@ export default function EmployeesScreen() {
 
   const handleToggleRole = (role: Role) => {
     if (formData.roles.includes(role)) {
-      setFormData({
-        ...formData,
-        roles: formData.roles.filter((r) => r !== role),
-      });
+      setFormData({ ...formData, roles: formData.roles.filter((r) => r !== role) });
     } else {
-      setFormData({
-        ...formData,
-        roles: [...formData.roles, role],
-      });
+      setFormData({ ...formData, roles: [...formData.roles, role] });
     }
   };
 
@@ -148,46 +115,29 @@ export default function EmployeesScreen() {
     setIsSaving(true);
     try {
       if (editingId) {
-        const backendRoles = formData.roles.map(r => {
-          const roleMap: Record<Role, string> = {
-            'Vendas': 'sales',
-            'Locação': 'rental',
-            'Assistência Técnica': 'technical',
-            'Peças': 'parts',
-            'Admin': 'admin',
-          };
-          return roleMap[r];
-        }) as ('admin' | 'sales' | 'rental' | 'technical' | 'parts')[];
-        
-        await updateEmployeeMutation.mutateAsync({
-          id: editingId,
-          name: formData.fullName,
-          roles: backendRoles,
-        });
+        if (atualizarColaborador) {
+          const result = await atualizarColaborador(editingId, {
+            fullName: formData.fullName,
+            roles: formData.roles,
+          });
+          if (!result) throw new Error('Falha ao atualizar');
+        }
       } else {
-        const backendRoles = formData.roles.map(r => {
-          const roleMap: Record<Role, string> = {
-            'Vendas': 'sales',
-            'Locação': 'rental',
-            'Assistência Técnica': 'technical',
-            'Peças': 'parts',
-            'Admin': 'admin',
-          };
-          return roleMap[r];
-        }) as ('admin' | 'sales' | 'rental' | 'technical' | 'parts')[];
-        
-        await createEmployeeMutation.mutateAsync({
-          email: formData.email,
-          name: formData.fullName,
-          roles: backendRoles,
-          password: formData.password,
-        });
+        if (criarColaborador) {
+          const result = await criarColaborador({
+            email: formData.email,
+            fullName: formData.fullName,
+            roles: formData.roles,
+            password: formData.password,
+          });
+          if (!result) throw new Error('Falha ao criar');
+        }
       }
       setIsModalVisible(false);
       resetForm();
     } catch (error: any) {
       console.error('Error saving employee:', error);
-      if (error.message?.includes('already registered')) {
+      if (error.message?.includes('já cadastrado') || error.message?.includes('already registered')) {
         Alert.alert('Erro', 'E-mail já cadastrado');
       } else {
         Alert.alert('Erro', 'Ocorreu um erro ao salvar o colaborador');
@@ -208,7 +158,9 @@ export default function EmployeesScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeEmployeeMutation.mutateAsync({ id });
+              if (removerColaborador) {
+                await removerColaborador(id);
+              }
             } catch (error) {
               console.error('Error deleting employee:', error);
               Alert.alert('Erro', 'Ocorreu um erro ao excluir o colaborador');
@@ -237,20 +189,24 @@ export default function EmployeesScreen() {
           </View>
         </View>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => handleOpenModal(item)}
-        >
-          <Edit2 size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDelete(item.id, item.fullName)}
-        >
-          <Trash2 size={18} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {item.id !== user?.id && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editButton]}
+            onPress={() => handleOpenModal(item)}
+            activeOpacity={0.7}
+          >
+            <Edit2 size={18} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => handleDelete(item.id, item.fullName)}
+            activeOpacity={0.7}
+          >
+            <Trash2 size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -277,7 +233,7 @@ export default function EmployeesScreen() {
         options={{
           title: 'Colaboradores',
           headerRight: () => (
-            <TouchableOpacity onPress={() => handleOpenModal()}>
+            <TouchableOpacity onPress={() => handleOpenModal()} activeOpacity={0.7}>
               <Plus size={24} color={Colors.primary} />
             </TouchableOpacity>
           ),
@@ -292,6 +248,9 @@ export default function EmployeesScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Nenhum colaborador cadastrado</Text>
+            <Text style={styles.emptySubtext}>
+              Toque no + para adicionar um colaborador
+            </Text>
           </View>
         }
       />
@@ -315,6 +274,7 @@ export default function EmployeesScreen() {
                 setIsModalVisible(false);
                 resetForm();
               }}
+              activeOpacity={0.7}
             >
               <Text style={styles.cancelButton}>Cancelar</Text>
             </TouchableOpacity>
@@ -326,7 +286,8 @@ export default function EmployeesScreen() {
               style={styles.input}
               value={formData.email}
               onChangeText={(text) => setFormData({ ...formData, email: text })}
-              placeholder="exemplo@indi.test"
+              placeholder="exemplo@indi.com"
+              placeholderTextColor={Colors.textSecondary}
               keyboardType="email-address"
               autoCapitalize="none"
               editable={!editingId}
@@ -338,6 +299,7 @@ export default function EmployeesScreen() {
               value={formData.fullName}
               onChangeText={(text) => setFormData({ ...formData, fullName: text })}
               placeholder="Nome do colaborador"
+              placeholderTextColor={Colors.textSecondary}
             />
 
             {!editingId && (
@@ -347,7 +309,8 @@ export default function EmployeesScreen() {
                   style={styles.input}
                   value={formData.password}
                   onChangeText={(text) => setFormData({ ...formData, password: text })}
-                  placeholder="Senha do colaborador"
+                  placeholder="Mínimo 6 caracteres"
+                  placeholderTextColor={Colors.textSecondary}
                   secureTextEntry
                   autoCapitalize="none"
                 />
@@ -365,6 +328,7 @@ export default function EmployeesScreen() {
                     formData.roles.includes(role.value) && styles.roleOptionActive,
                   ]}
                   onPress={() => handleToggleRole(role.value)}
+                  activeOpacity={0.7}
                 >
                   <Text
                     style={[
@@ -382,6 +346,7 @@ export default function EmployeesScreen() {
               style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={isSaving}
+              activeOpacity={0.7}
             >
               {isSaving ? (
                 <ActivityIndicator color="#fff" />
@@ -405,6 +370,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    backgroundColor: Colors.background,
   },
   errorText: {
     fontSize: 16,
@@ -426,6 +392,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   employeeInfo: {
     flex: 1,
@@ -494,6 +462,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: Colors.textSecondary,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.textLight,
+    textAlign: 'center' as const,
   },
   modalContainer: {
     flex: 1,

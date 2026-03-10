@@ -2,43 +2,32 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import { useRouter } from 'expo-router';
 import { MessageSquare } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
-import { useAppState } from '@/contexts/AppStateContext';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { conversas } = useData();
-  const { isLoading } = useAppState();
+  const mockData = useMockData();
   const router = useRouter();
 
-  if (!user) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.subtitle}>Carregando...</Text>
-      </View>
-    );
-  }
+  const listConversasPorUsuario = mockData?.listConversasPorUsuario ?? (() => []);
+  const isLoading = mockData?.isLoading ?? false;
 
-  const conversasAbertas = conversas.filter(c => c.status === 'aberta');
+  const conversas = user ? listConversasPorUsuario(user) : [];
+  const conversasAbertas = conversas.filter((c: any) => c.status === 'aberta');
 
   const formatDate = (date: string) => {
-    const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) {
-      return 'Hoje';
-    } else if (days === 1) {
-      return 'Ontem';
-    } else if (days < 7) {
-      return `${days} dias atrás`;
-    } else {
-      return new Date(date).toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-      });
+    try {
+      const now = new Date();
+      const diff = now.getTime() - new Date(date).getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      if (days === 0) return 'Hoje';
+      if (days === 1) return 'Ontem';
+      if (days < 7) return `${days} dias atrás`;
+      return new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    } catch {
+      return '';
     }
   };
 
@@ -46,6 +35,7 @@ export default function HomeScreen() {
     <TouchableOpacity
       style={styles.conversaCard}
       onPress={() => router.push(`/chat/${item.id}` as any)}
+      activeOpacity={0.7}
     >
       <View style={styles.iconContainer}>
         <MessageSquare size={24} color={Colors.primary} />
@@ -56,14 +46,22 @@ export default function HomeScreen() {
       </View>
       <View style={styles.conversaMeta}>
         <Text style={styles.conversaDate}>{formatDate(item.updatedAt)}</Text>
-        {item.prioridade && (
+        {item.prioridade ? (
           <View style={styles.priorityBadge}>
             <Text style={styles.priorityText}>{item.prioridade}</Text>
           </View>
-        )}
+        ) : null}
       </View>
     </TouchableOpacity>
   );
+
+  if (!user) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -79,8 +77,8 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Olá, {user.fullName}!</Text>
         <Text style={styles.subtitle}>
-          {user.type === 'client' 
-            ? 'Seus atendimentos em aberto' 
+          {user.type === 'client'
+            ? 'Seus atendimentos em aberto'
             : 'Atendimentos pendentes'}
         </Text>
       </View>
@@ -119,6 +117,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    backgroundColor: Colors.background,
   },
   header: {
     padding: 24,

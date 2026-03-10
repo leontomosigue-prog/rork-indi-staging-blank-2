@@ -18,90 +18,106 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const loadConversas = useCallback(async () => {
     if (!user) return;
-
     startOperation('loadConversas', 'fetching_data');
-    const response = await dataGateway.listConversasPorUsuario(
-      user.id,
-      user.type,
-      user.roles
-    );
-    
-    if (response.status === 'ok') {
-      setConversas(response.data);
+    try {
+      const response = await dataGateway.listConversasPorUsuario(
+        user.id,
+        user.type,
+        user.roles
+      );
+      if (response.status === 'ok') {
+        setConversas(response.data);
+        endOperation();
+      } else {
+        setError({ ...response, module: 'chat' });
+      }
+    } catch (error) {
+      console.error('[DataContext] loadConversas threw:', error);
       endOperation();
-    } else {
-      setError({ ...response, module: 'chat' });
     }
   }, [user, startOperation, endOperation, setError]);
 
   const loadMaquinas = useCallback(async () => {
     startOperation('loadMaquinas', 'fetching_data');
-    
-    const [vendaResponse, locacaoResponse] = await Promise.all([
-      dataGateway.listMaquinas('venda'),
-      dataGateway.listMaquinas('locacao'),
-    ]);
-
-    if (vendaResponse.status === 'ok' && locacaoResponse.status === 'ok') {
-      setMaquinasVenda(vendaResponse.data);
-      setMaquinasLocacao(locacaoResponse.data);
+    try {
+      const [vendaResponse, locacaoResponse] = await Promise.all([
+        dataGateway.listMaquinas('venda'),
+        dataGateway.listMaquinas('locacao'),
+      ]);
+      if (vendaResponse.status === 'ok' && locacaoResponse.status === 'ok') {
+        setMaquinasVenda(vendaResponse.data);
+        setMaquinasLocacao(locacaoResponse.data);
+        endOperation();
+      } else {
+        setError({
+          errorCode: 'FETCH_FAILED',
+          errorMessage: 'Erro ao carregar máquinas',
+          module: 'catalog',
+        });
+      }
+    } catch (error) {
+      console.error('[DataContext] loadMaquinas threw:', error);
       endOperation();
-    } else {
-      setError({
-        errorCode: 'FETCH_FAILED',
-        errorMessage: 'Erro ao carregar máquinas',
-        module: 'catalog',
-      });
     }
   }, [startOperation, endOperation, setError]);
 
   const loadPecas = useCallback(async () => {
     startOperation('loadPecas', 'fetching_data');
-    const response = await dataGateway.listPecas();
-    
-    if (response.status === 'ok') {
-      setPecas(response.data);
+    try {
+      const response = await dataGateway.listPecas();
+      if (response.status === 'ok') {
+        setPecas(response.data);
+        endOperation();
+      } else {
+        setError({ ...response, module: 'catalog' });
+      }
+    } catch (error) {
+      console.error('[DataContext] loadPecas threw:', error);
       endOperation();
-    } else {
-      setError({ ...response, module: 'catalog' });
     }
   }, [startOperation, endOperation, setError]);
 
   const loadColaboradores = useCallback(async () => {
     if (user?.type !== 'employee' || !user?.roles?.includes('Admin')) return;
-
     startOperation('loadColaboradores', 'fetching_data');
-    const response = await dataGateway.listColaboradores();
-    
-    if (response.status === 'ok') {
-      setColaboradores(response.data);
+    try {
+      const response = await dataGateway.listColaboradores();
+      if (response.status === 'ok') {
+        setColaboradores(response.data);
+        endOperation();
+      } else {
+        setError({ ...response, module: 'admin' });
+      }
+    } catch (error) {
+      console.error('[DataContext] loadColaboradores threw:', error);
       endOperation();
-    } else {
-      setError({ ...response, module: 'admin' });
     }
   }, [user, startOperation, endOperation, setError]);
 
   const loadClientes = useCallback(async () => {
     if (user?.type !== 'employee' || !user?.roles?.includes('Admin')) return;
-
     startOperation('loadClientes', 'fetching_data');
-    const response = await dataGateway.listClientes();
-    
-    if (response.status === 'ok') {
-      setClientes(response.data);
+    try {
+      const response = await dataGateway.listClientes();
+      if (response.status === 'ok') {
+        setClientes(response.data);
+        endOperation();
+      } else {
+        setError({ ...response, module: 'admin' });
+      }
+    } catch (error) {
+      console.error('[DataContext] loadClientes threw:', error);
       endOperation();
-    } else {
-      setError({ ...response, module: 'admin' });
     }
   }, [user, startOperation, endOperation, setError]);
 
   useEffect(() => {
     if (user) {
-      loadConversas();
-      loadMaquinas();
-      loadPecas();
-      loadColaboradores();
-      loadClientes();
+      void loadConversas();
+      void loadMaquinas();
+      void loadPecas();
+      void loadColaboradores();
+      void loadClientes();
     }
   }, [user, loadConversas, loadMaquinas, loadPecas, loadColaboradores, loadClientes]);
 
@@ -112,20 +128,24 @@ export const [DataProvider, useData] = createContextHook(() => {
     prioridade?: Priority;
   }): Promise<string | null> => {
     if (!user) return null;
-
     startOperation('criarConversa', 'sending_data');
-    const response = await dataGateway.criarConversa({
-      userId: user.id,
-      userName: user.fullName,
-      ...params,
-    });
-
-    if (response.status === 'ok') {
-      await loadConversas();
+    try {
+      const response = await dataGateway.criarConversa({
+        userId: user.id,
+        userName: user.fullName,
+        ...params,
+      });
+      if (response.status === 'ok') {
+        await loadConversas();
+        endOperation();
+        return response.data;
+      } else {
+        setError({ ...response, module: 'chat' });
+        return null;
+      }
+    } catch (error) {
+      console.error('[DataContext] criarConversa threw:', error);
       endOperation();
-      return response.data;
-    } else {
-      setError({ ...response, module: 'chat' });
       return null;
     }
   }, [user, startOperation, endOperation, setError, loadConversas]);
@@ -134,153 +154,201 @@ export const [DataProvider, useData] = createContextHook(() => {
     if (mensagens[conversaId]) {
       return mensagens[conversaId];
     }
-
     startOperation(`loadMensagens:${conversaId}`, 'fetching_data');
-    const response = await dataGateway.listMensagens(conversaId);
-
-    if (response.status === 'ok') {
-      setMensagens(prev => ({ ...prev, [conversaId]: response.data }));
+    try {
+      const response = await dataGateway.listMensagens(conversaId);
+      if (response.status === 'ok') {
+        setMensagens(prev => ({ ...prev, [conversaId]: response.data }));
+        endOperation();
+        return response.data;
+      } else {
+        setError({ ...response, module: 'chat' });
+        return [];
+      }
+    } catch (error) {
+      console.error('[DataContext] loadMensagens threw:', error);
       endOperation();
-      return response.data;
-    } else {
-      setError({ ...response, module: 'chat' });
       return [];
     }
   }, [mensagens, startOperation, endOperation, setError]);
 
   const enviarMensagem = useCallback(async (conversaId: string, texto: string): Promise<boolean> => {
     if (!user) return false;
-
     startOperation('enviarMensagem', 'sending_data');
-    const response = await dataGateway.enviarMensagem({
-      conversaId,
-      autorId: user.id,
-      autorNome: user.fullName,
-      texto,
-    });
-
-    if (response.status === 'ok') {
-      setMensagens(prev => ({
-        ...prev,
-        [conversaId]: [...(prev[conversaId] || []), response.data],
-      }));
-      await loadConversas();
+    try {
+      const response = await dataGateway.enviarMensagem({
+        conversaId,
+        autorId: user.id,
+        autorNome: user.fullName,
+        texto,
+      });
+      if (response.status === 'ok') {
+        setMensagens(prev => ({
+          ...prev,
+          [conversaId]: [...(prev[conversaId] || []), response.data],
+        }));
+        await loadConversas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'chat' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] enviarMensagem threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'chat' });
       return false;
     }
   }, [user, startOperation, endOperation, setError, loadConversas]);
 
   const marcarConversaComoResolvida = useCallback(async (conversaId: string): Promise<boolean> => {
     startOperation('marcarConversaComoResolvida', 'processing_request');
-    const response = await dataGateway.marcarConversaComoResolvida(conversaId);
-
-    if (response.status === 'ok') {
-      await loadConversas();
+    try {
+      const response = await dataGateway.marcarConversaComoResolvida(conversaId);
+      if (response.status === 'ok') {
+        await loadConversas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'chat' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] marcarConversaComoResolvida threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'chat' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadConversas]);
 
   const reabrirConversa = useCallback(async (conversaId: string): Promise<boolean> => {
     startOperation('reabrirConversa', 'processing_request');
-    const response = await dataGateway.reabrirConversa(conversaId);
-
-    if (response.status === 'ok') {
-      await loadConversas();
+    try {
+      const response = await dataGateway.reabrirConversa(conversaId);
+      if (response.status === 'ok') {
+        await loadConversas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'chat' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] reabrirConversa threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'chat' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadConversas]);
 
   const criarMaquina = useCallback(async (data: Omit<Maquina, 'id'>): Promise<boolean> => {
     startOperation('criarMaquina', 'sending_data');
-    const response = await dataGateway.criarMaquina(data);
-
-    if (response.status === 'ok') {
-      await loadMaquinas();
+    try {
+      const response = await dataGateway.criarMaquina(data);
+      if (response.status === 'ok') {
+        await loadMaquinas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'catalog' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] criarMaquina threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'catalog' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadMaquinas]);
 
   const atualizarMaquina = useCallback(async (id: string, data: Partial<Maquina>): Promise<boolean> => {
     startOperation('atualizarMaquina', 'sending_data');
-    const response = await dataGateway.atualizarMaquina(id, data);
-
-    if (response.status === 'ok') {
-      await loadMaquinas();
+    try {
+      const response = await dataGateway.atualizarMaquina(id, data);
+      if (response.status === 'ok') {
+        await loadMaquinas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'catalog' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] atualizarMaquina threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'catalog' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadMaquinas]);
 
   const removerMaquina = useCallback(async (id: string): Promise<boolean> => {
     startOperation('removerMaquina', 'processing_request');
-    const response = await dataGateway.removerMaquina(id);
-
-    if (response.status === 'ok') {
-      await loadMaquinas();
+    try {
+      const response = await dataGateway.removerMaquina(id);
+      if (response.status === 'ok') {
+        await loadMaquinas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'catalog' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] removerMaquina threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'catalog' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadMaquinas]);
 
   const criarPeca = useCallback(async (data: Omit<Peca, 'id'>): Promise<boolean> => {
     startOperation('criarPeca', 'sending_data');
-    const response = await dataGateway.criarPeca(data);
-
-    if (response.status === 'ok') {
-      await loadPecas();
+    try {
+      const response = await dataGateway.criarPeca(data);
+      if (response.status === 'ok') {
+        await loadPecas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'catalog' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] criarPeca threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'catalog' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadPecas]);
 
   const atualizarPeca = useCallback(async (id: string, data: Partial<Peca>): Promise<boolean> => {
     startOperation('atualizarPeca', 'sending_data');
-    const response = await dataGateway.atualizarPeca(id, data);
-
-    if (response.status === 'ok') {
-      await loadPecas();
+    try {
+      const response = await dataGateway.atualizarPeca(id, data);
+      if (response.status === 'ok') {
+        await loadPecas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'catalog' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] atualizarPeca threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'catalog' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadPecas]);
 
   const removerPeca = useCallback(async (id: string): Promise<boolean> => {
     startOperation('removerPeca', 'processing_request');
-    const response = await dataGateway.removerPeca(id);
-
-    if (response.status === 'ok') {
-      await loadPecas();
+    try {
+      const response = await dataGateway.removerPeca(id);
+      if (response.status === 'ok') {
+        await loadPecas();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'catalog' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] removerPeca threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'catalog' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadPecas]);
@@ -292,42 +360,57 @@ export const [DataProvider, useData] = createContextHook(() => {
     password: string;
   }): Promise<boolean> => {
     startOperation('criarColaborador', 'sending_data');
-    const response = await dataGateway.criarColaborador(data);
-
-    if (response.status === 'ok') {
-      await loadColaboradores();
+    try {
+      const response = await dataGateway.criarColaborador(data);
+      if (response.status === 'ok') {
+        await loadColaboradores();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'admin' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] criarColaborador threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'admin' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadColaboradores]);
 
   const atualizarColaborador = useCallback(async (id: string, data: Partial<User>): Promise<boolean> => {
     startOperation('atualizarColaborador', 'sending_data');
-    const response = await dataGateway.atualizarColaborador(id, data);
-
-    if (response.status === 'ok') {
-      await loadColaboradores();
+    try {
+      const response = await dataGateway.atualizarColaborador(id, data);
+      if (response.status === 'ok') {
+        await loadColaboradores();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'admin' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] atualizarColaborador threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'admin' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadColaboradores]);
 
   const removerColaborador = useCallback(async (id: string): Promise<boolean> => {
     startOperation('removerColaborador', 'processing_request');
-    const response = await dataGateway.removerColaborador(id);
-
-    if (response.status === 'ok') {
-      await loadColaboradores();
+    try {
+      const response = await dataGateway.removerColaborador(id);
+      if (response.status === 'ok') {
+        await loadColaboradores();
+        endOperation();
+        return true;
+      } else {
+        setError({ ...response, module: 'admin' });
+        return false;
+      }
+    } catch (error) {
+      console.error('[DataContext] removerColaborador threw:', error);
       endOperation();
-      return true;
-    } else {
-      setError({ ...response, module: 'admin' });
       return false;
     }
   }, [startOperation, endOperation, setError, loadColaboradores]);

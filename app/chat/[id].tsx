@@ -14,36 +14,28 @@ import {
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Send, CheckCircle, MessageCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
-import { useAppState } from '@/contexts/AppStateContext';
-import type { Mensagem } from '@/lib/data-gateway';
+import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { conversas, loadMensagens, enviarMensagem, marcarConversaComoResolvida, reabrirConversa, mensagens: allMensagens } = useData();
-  const { isLoading } = useAppState();
+  const mockData = useMockData();
+
+  const conversas = mockData?.conversas ?? [];
+  const listMensagens = mockData?.listMensagens ?? (() => []);
+  const enviarMensagem = mockData?.enviarMensagem;
+  const marcarConversaComoResolvida = mockData?.marcarConversaComoResolvida;
+  const reabrirConversa = mockData?.reabrirConversa;
+
   const [messageText, setMessageText] = useState('');
-  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const conversa = conversas.find((c) => c.id === id);
-
-  useEffect(() => {
-    const loadMessages = async () => {
-      if (id) {
-        if (allMensagens[id]) {
-          setMensagens(allMensagens[id]);
-        } else {
-          const msgs = await loadMensagens(id);
-          setMensagens(msgs);
-        }
-      }
-    };
-    loadMessages();
-  }, [id, allMensagens, loadMensagens]);
+  const conversa = conversas.find((c: any) => c.id === id);
+  const mensagens = id ? listMensagens(id) : [];
 
   useEffect(() => {
     if (mensagens.length > 0) {
@@ -51,24 +43,32 @@ export default function ChatScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [mensagens]);
+  }, [mensagens.length]);
 
   const handleSend = async () => {
-    if (!messageText.trim() || !user?.id || !id) return;
+    if (!messageText.trim() || !user?.id || !id || !enviarMensagem) return;
 
-    const result = await enviarMensagem(id, messageText.trim());
-    if (result) {
-      setMessageText('');
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    } else {
-      Alert.alert('Erro', 'Não foi possível enviar a mensagem');
+    setIsSending(true);
+    try {
+      const result = await enviarMensagem(id, messageText.trim());
+      if (result) {
+        setMessageText('');
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } else {
+        Alert.alert('Erro', 'Não foi possível enviar a mensagem');
+      }
+    } catch (error) {
+      console.error('ChatScreen: handleSend error:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao enviar a mensagem');
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleResolve = async () => {
-    if (!user?.id || !id) return;
+    if (!user?.id || !id || !marcarConversaComoResolvida) return;
 
     Alert.alert(
       'Resolver conversa',
@@ -78,11 +78,14 @@ export default function ChatScreen() {
         {
           text: 'Resolver',
           onPress: async () => {
-            const result = await marcarConversaComoResolvida(id);
-            if (result) {
-              Alert.alert('Sucesso', 'Conversa marcada como resolvida');
-            } else {
+            setIsResolving(true);
+            try {
+              await marcarConversaComoResolvida(id);
+            } catch (error) {
+              console.error('ChatScreen: handleResolve error:', error);
               Alert.alert('Erro', 'Ocorreu um erro ao resolver a conversa');
+            } finally {
+              setIsResolving(false);
             }
           },
         },
@@ -91,13 +94,16 @@ export default function ChatScreen() {
   };
 
   const handleReopen = async () => {
-    if (!user?.id || !id) return;
+    if (!user?.id || !id || !reabrirConversa) return;
 
-    const result = await reabrirConversa(id);
-    if (result) {
-      Alert.alert('Sucesso', 'Conversa reaberta. Você pode continuar atendendo o cliente.');
-    } else {
+    setIsResolving(true);
+    try {
+      await reabrirConversa(id);
+    } catch (error) {
+      console.error('ChatScreen: handleReopen error:', error);
       Alert.alert('Erro', 'Ocorreu um erro ao reabrir a conversa');
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -147,7 +153,8 @@ export default function ChatScreen() {
   if (!conversa) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>Conversa não encontrada</Text>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.errorText}>Carregando conversa...</Text>
       </View>
     );
   }
@@ -166,10 +173,14 @@ export default function ChatScreen() {
           title: conversa.titulo,
           headerRight: canResolve
             ? () => (
-                <TouchableOpacity onPress={handleResolve} disabled={isLoading}>
+                <TouchableOpacity
+                  onPress={handleResolve}
+                  disabled={isResolving}
+                  activeOpacity={0.7}
+                >
                   <CheckCircle
                     size={24}
-                    color={isLoading ? Colors.textLight : '#10b981'}
+                    color={isResolving ? Colors.textLight : '#10b981'}
                   />
                 </TouchableOpacity>
               )
@@ -186,7 +197,9 @@ export default function ChatScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Nenhuma mensagem ainda</Text>
-            <Text style={styles.emptySubtext}>Envie uma mensagem para começar a conversa</Text>
+            <Text style={styles.emptySubtext}>
+              Envie uma mensagem para começar a conversa
+            </Text>
           </View>
         }
       />
@@ -205,12 +218,13 @@ export default function ChatScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              (!messageText.trim() || isLoading) && styles.sendButtonDisabled,
+              (!messageText.trim() || isSending) && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={!messageText.trim() || isLoading}
+            disabled={!messageText.trim() || isSending}
+            activeOpacity={0.7}
           >
-            {isLoading ? (
+            {isSending ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Send size={20} color="#fff" />
@@ -227,11 +241,12 @@ export default function ChatScreen() {
           </View>
           {user?.type === 'employee' && (
             <TouchableOpacity
-              style={[styles.reopenButton, isLoading && styles.reopenButtonDisabled]}
+              style={[styles.reopenButton, isResolving && styles.reopenButtonDisabled]}
               onPress={handleReopen}
-              disabled={isLoading}
+              disabled={isResolving}
+              activeOpacity={0.7}
             >
-              {isLoading ? (
+              {isResolving ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
@@ -256,6 +271,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    backgroundColor: Colors.background,
+    gap: 12,
   },
   errorText: {
     fontSize: 16,

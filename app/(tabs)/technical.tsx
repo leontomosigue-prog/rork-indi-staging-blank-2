@@ -28,7 +28,11 @@ const PRIORITIES: { value: Priority; label: string; color: string }[] = [
 export default function TechnicalScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { criarConversa, listConversasPorArea, isLoading } = useMockData();
+  const {
+    criarConversa = async () => '',
+    listConversasPorArea = () => [],
+    isLoading = false,
+  } = useMockData() ?? {};
   const [priority, setPriority] = useState<Priority>('Preventiva');
   const [description, setDescription] = useState('');
   const [photo1, setPhoto1] = useState('');

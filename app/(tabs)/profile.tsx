@@ -10,7 +10,7 @@ import Logo from '@/components/Logo';
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
-  const { conversas } = useMockData();
+  const { conversas = [] } = useMockData() ?? {};
   const [biometriaAtiva, setBiometriaAtiva] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);

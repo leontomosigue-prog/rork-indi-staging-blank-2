@@ -38,7 +38,14 @@ const CATEGORIES = [
 export default function PartsScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { listPecas, criarPeca, atualizarPeca, removerPeca, criarConversa, isLoading } = useMockData();
+  const {
+    listPecas = () => [],
+    criarPeca = async () => null,
+    atualizarPeca = async () => null,
+    removerPeca = async () => {},
+    criarConversa = async () => '',
+    isLoading = false,
+  } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingPart, setEditingPart] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');

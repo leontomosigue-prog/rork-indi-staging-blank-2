@@ -31,7 +31,14 @@ interface RentalFormData {
 export default function RentalScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { listMaquinas, criarMaquina, atualizarMaquina, removerMaquina, criarConversa, isLoading } = useMockData();
+  const {
+    listMaquinas = () => [],
+    criarMaquina = async () => null,
+    atualizarMaquina = async () => null,
+    removerMaquina = async () => {},
+    criarConversa = async () => '',
+    isLoading = false,
+  } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState<string | null>(null);
   const [formData, setFormData] = useState<RentalFormData>({

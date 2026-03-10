@@ -29,7 +29,11 @@ const AREAS: { value: Area; label: string }[] = [
 export default function MessagesScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { listConversasPorUsuario, criarConversa, isLoading } = useMockData();
+  const {
+    listConversasPorUsuario = () => [],
+    criarConversa = async () => '',
+    isLoading = false,
+  } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedArea, setSelectedArea] = useState<Area>('Vendas');
   const [reason, setReason] = useState('');
