@@ -15,7 +15,7 @@ import {
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList, ChevronDown, Camera, Check } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList, ChevronDown, Camera, Check, Filter } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -110,7 +110,12 @@ export default function RentalScreen() {
   const [isRequesting, setIsRequesting] = useState(false);
   const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
 
-  const maquinas = listMaquinas('locacao');
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  const allMaquinas = listMaquinas('locacao');
+  const maquinas = activeFilter
+    ? allMaquinas.filter((m: any) => m.tipoMaquina === activeFilter)
+    : allMaquinas;
 
   const isAdmin = user?.roles?.includes('Admin');
   const hasRentalRole = user?.roles?.includes('Locação');
@@ -366,21 +371,53 @@ export default function RentalScreen() {
     </View>
   );
 
+  const FILTER_OPTIONS = [
+    { id: 'paleteira', label: 'Paleteiras' },
+    { id: 'transpaleteira', label: 'Transpaleteiras' },
+    { id: 'empilhadeira', label: 'Empilhadeiras' },
+    { id: 'retratil', label: 'Retráteis' },
+  ];
+
   const ListHeader = () => (
-    <TouchableOpacity
-      style={styles.customRequestBanner}
-      onPress={() => setIsCustomRequestVisible(true)}
-      activeOpacity={0.85}
-    >
-      <View style={styles.customRequestIconWrap}>
-        <ClipboardList size={22} color="#fff" />
+    <>
+      <TouchableOpacity
+        style={styles.customRequestBanner}
+        onPress={() => setIsCustomRequestVisible(true)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.customRequestIconWrap}>
+          <ClipboardList size={22} color="#fff" />
+        </View>
+        <View style={styles.customRequestTextWrap}>
+          <Text style={styles.customRequestTitle}>Solicitação Personalizada</Text>
+          <Text style={styles.customRequestSubtitle}>Não encontrou o que precisa? Descreva sua necessidade</Text>
+        </View>
+        <Text style={styles.customRequestArrow}>›</Text>
+      </TouchableOpacity>
+
+      <View style={styles.filterRow}>
+        <Filter size={14} color={Colors.textLight} style={styles.filterIcon} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
+          <TouchableOpacity
+            style={[styles.filterChip, activeFilter === null && styles.filterChipActive]}
+            onPress={() => setActiveFilter(null)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.filterChipText, activeFilter === null && styles.filterChipTextActive]}>Todos</Text>
+          </TouchableOpacity>
+          {FILTER_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.id}
+              style={[styles.filterChip, activeFilter === opt.id && styles.filterChipActive]}
+              onPress={() => setActiveFilter(activeFilter === opt.id ? null : opt.id)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.filterChipText, activeFilter === opt.id && styles.filterChipTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-      <View style={styles.customRequestTextWrap}>
-        <Text style={styles.customRequestTitle}>Solicitação Personalizada</Text>
-        <Text style={styles.customRequestSubtitle}>Não encontrou o que precisa? Descreva sua necessidade</Text>
-      </View>
-      <Text style={styles.customRequestArrow}>›</Text>
-    </TouchableOpacity>
+    </>
   );
 
   if (isLoading) {
@@ -1165,5 +1202,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700' as const,
+  },
+  filterRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 16,
+    gap: 8,
+  },
+  filterIcon: {
+    marginRight: 2,
+  },
+  filterScrollContent: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.lightSurface,
+    borderWidth: 1.5,
+    borderColor: Colors.lightBorder,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.area.locacao,
+    borderColor: Colors.area.locacao,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.textDarkLight,
+  },
+  filterChipTextActive: {
+    color: '#fff',
   },
 });

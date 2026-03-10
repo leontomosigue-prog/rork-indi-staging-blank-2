@@ -23,6 +23,8 @@ import Logo from '@/components/Logo';
 
 type CatalogTab = 'vendas' | 'locacao' | 'pecas';
 
+type TipoMaquinaLocacao = 'paleteira' | 'transpaleteira' | 'empilhadeira' | 'retratil';
+
 interface MachineFormData {
   nome: string;
   marca: string;
@@ -31,6 +33,7 @@ interface MachineFormData {
   diaria: string;
   mensal: string;
   imageUrl: string;
+  tipoMaquina: TipoMaquinaLocacao | '';
 }
 
 interface PartFormData {
@@ -41,6 +44,13 @@ interface PartFormData {
   estoque: string;
   imageUrl: string;
 }
+
+const MACHINE_TYPE_OPTIONS: { value: TipoMaquinaLocacao; label: string }[] = [
+  { value: 'paleteira', label: 'Paleteira' },
+  { value: 'transpaleteira', label: 'Transpaleteira' },
+  { value: 'empilhadeira', label: 'Empilhadeira' },
+  { value: 'retratil', label: 'Retrátil' },
+];
 
 const CATEGORIES = [
   { value: 'hidraulica' as const, label: 'Hidráulica' },
@@ -74,6 +84,7 @@ export default function CatalogScreen() {
     diaria: '',
     mensal: '',
     imageUrl: '',
+    tipoMaquina: '',
   });
   const [partFormData, setPartFormData] = useState<PartFormData>({
     sku: '',
@@ -93,7 +104,7 @@ export default function CatalogScreen() {
   const pecas = listPecas();
 
   const resetMachineForm = () => {
-    setMachineFormData({ nome: '', marca: '', modelo: '', preco: '', diaria: '', mensal: '', imageUrl: '' });
+    setMachineFormData({ nome: '', marca: '', modelo: '', preco: '', diaria: '', mensal: '', imageUrl: '', tipoMaquina: '' });
     setEditingId(null);
   };
 
@@ -113,6 +124,7 @@ export default function CatalogScreen() {
         diaria: machine.diaria?.toString() || '',
         mensal: machine.mensal?.toString() || '',
         imageUrl: machine.imageUrl || '',
+        tipoMaquina: (machine.tipoMaquina as TipoMaquinaLocacao) || '',
       });
     } else {
       resetMachineForm();
@@ -178,6 +190,9 @@ export default function CatalogScreen() {
         }
         data.diaria = diaria;
         data.mensal = mensal;
+        if (machineFormData.tipoMaquina) {
+          data.tipoMaquina = machineFormData.tipoMaquina;
+        }
       }
 
       if (machineFormData.imageUrl) {
@@ -659,6 +674,33 @@ export default function CatalogScreen() {
                   placeholder="Ex: CPD18"
                   placeholderTextColor={Colors.textSecondary}
                 />
+
+                {activeTab === 'locacao' && (
+                  <>
+                    <Text style={styles.label}>Tipo de Máquina</Text>
+                    <View style={styles.categoryGrid}>
+                      {MACHINE_TYPE_OPTIONS.map((opt) => (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[
+                            styles.categoryOption,
+                            machineFormData.tipoMaquina === opt.value && styles.categoryOptionActive,
+                          ]}
+                          onPress={() => setMachineFormData({ ...machineFormData, tipoMaquina: opt.value })}
+                        >
+                          <Text
+                            style={[
+                              styles.categoryOptionText,
+                              machineFormData.tipoMaquina === opt.value && styles.categoryOptionTextActive,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
 
                 {activeTab === 'vendas' ? (
                   <>

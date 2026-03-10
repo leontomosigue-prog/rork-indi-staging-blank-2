@@ -30,9 +30,12 @@ type Mensagem = {
   createdAt: string;
 };
 
+type TipoMaquina = 'paleteira' | 'transpaleteira' | 'empilhadeira' | 'retratil';
+
 type Maquina = {
   id: string;
   tipo: 'venda' | 'locacao';
+  tipoMaquina?: TipoMaquina;
   nome: string;
   marca: string;
   modelo: string;
@@ -95,6 +98,7 @@ const MOCK_MAQUINAS_LOCACAO: Maquina[] = [
   {
     id: 'ml1',
     tipo: 'locacao',
+    tipoMaquina: 'empilhadeira',
     nome: 'Empilhadeira para Locação 2.5T',
     marca: 'Heli',
     modelo: 'CPD25',
@@ -105,6 +109,7 @@ const MOCK_MAQUINAS_LOCACAO: Maquina[] = [
   {
     id: 'ml2',
     tipo: 'locacao',
+    tipoMaquina: 'empilhadeira',
     nome: 'Empilhadeira para Locação 1.8T',
     marca: 'Yale',
     modelo: 'ERP18',
