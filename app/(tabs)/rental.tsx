@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { Plus, Edit2, Trash2, Calendar, ImageIcon, X } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -28,6 +28,15 @@ interface RentalFormData {
   imageUrl: string;
 }
 
+interface CustomRequestFormData {
+  tipoMaquina: string;
+  capacidadeCarga: string;
+  elevacaoNecessaria: string;
+  dataInicio: string;
+  dataFim: string;
+  descricao: string;
+}
+
 export default function RentalScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -40,6 +49,7 @@ export default function RentalScreen() {
     isLoading = false,
   } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCustomRequestVisible, setIsCustomRequestVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState<string | null>(null);
   const [formData, setFormData] = useState<RentalFormData>({
     nome: '',
@@ -49,8 +59,17 @@ export default function RentalScreen() {
     mensal: '',
     imageUrl: '',
   });
+  const [customForm, setCustomForm] = useState<CustomRequestFormData>({
+    tipoMaquina: '',
+    capacidadeCarga: '',
+    elevacaoNecessaria: '',
+    dataInicio: '',
+    dataFim: '',
+    descricao: '',
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
 
   const maquinas = listMaquinas('locacao');
 
@@ -62,6 +81,17 @@ export default function RentalScreen() {
   const resetForm = () => {
     setFormData({ nome: '', marca: '', modelo: '', diaria: '', mensal: '', imageUrl: '' });
     setEditingOffer(null);
+  };
+
+  const resetCustomForm = () => {
+    setCustomForm({
+      tipoMaquina: '',
+      capacidadeCarga: '',
+      elevacaoNecessaria: '',
+      dataInicio: '',
+      dataFim: '',
+      descricao: '',
+    });
   };
 
   const handleOpenModal = (offer?: any) => {
@@ -167,6 +197,42 @@ export default function RentalScreen() {
     }
   };
 
+  const handleSubmitCustomRequest = async () => {
+    if (!customForm.tipoMaquina || !customForm.dataInicio || !customForm.dataFim) {
+      Alert.alert('Campos obrigatórios', 'Preencha pelo menos o tipo de máquina e o período desejado.');
+      return;
+    }
+
+    setIsSubmittingCustom(true);
+    try {
+      const mensagem = `📋 SOLICITAÇÃO PERSONALIZADA DE LOCAÇÃO\n\n` +
+        `Tipo de máquina: ${customForm.tipoMaquina}\n` +
+        `Capacidade de carga: ${customForm.capacidadeCarga || 'Não informado'}\n` +
+        `Elevação necessária: ${customForm.elevacaoNecessaria || 'Não informado'}\n` +
+        `Período: ${customForm.dataInicio} até ${customForm.dataFim}\n` +
+        `\nDescrição / Observações:\n${customForm.descricao || 'Sem observações'}`;
+
+      const conversaId = await criarConversa({
+        area: 'Locação',
+        titulo: `Solicitação Personalizada - ${customForm.tipoMaquina}`,
+        mensagemInicial: mensagem,
+      });
+
+      if (conversaId) {
+        setIsCustomRequestVisible(false);
+        resetCustomForm();
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível enviar a solicitação');
+      }
+    } catch (error) {
+      console.error('Error submitting custom request:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao enviar a solicitação');
+    } finally {
+      setIsSubmittingCustom(false);
+    }
+  };
+
   const renderOffer = ({ item }: any) => (
     <View style={styles.offerCard}>
       {item.imageUrl ? (
@@ -226,6 +292,23 @@ export default function RentalScreen() {
     </View>
   );
 
+  const ListHeader = () => (
+    <TouchableOpacity
+      style={styles.customRequestBanner}
+      onPress={() => setIsCustomRequestVisible(true)}
+      activeOpacity={0.85}
+    >
+      <View style={styles.customRequestIconWrap}>
+        <ClipboardList size={22} color="#fff" />
+      </View>
+      <View style={styles.customRequestTextWrap}>
+        <Text style={styles.customRequestTitle}>Solicitação Personalizada</Text>
+        <Text style={styles.customRequestSubtitle}>Não encontrou o que precisa? Descreva sua necessidade</Text>
+      </View>
+      <Text style={styles.customRequestArrow}>›</Text>
+    </TouchableOpacity>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -254,6 +337,7 @@ export default function RentalScreen() {
         data={maquinas}
         keyExtractor={(item) => item.id}
         renderItem={renderOffer}
+        ListHeaderComponent={<ListHeader />}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -262,6 +346,121 @@ export default function RentalScreen() {
         }
       />
 
+      {/* Custom Request Modal */}
+      <Modal
+        visible={isCustomRequestVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          setIsCustomRequestVisible(false);
+          resetCustomForm();
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setIsCustomRequestVisible(false);
+                resetCustomForm();
+              }}
+            >
+              <X size={22} color={Colors.textDarkLight} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Solicitação Personalizada</Text>
+            <View style={{ width: 22 }} />
+          </View>
+
+          <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+            <Text style={styles.formSectionNote}>
+              Preencha os detalhes da sua necessidade e nossa equipe entrará em contato.
+            </Text>
+
+            <Text style={styles.label}>Tipo de máquina <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              value={customForm.tipoMaquina}
+              onChangeText={(t) => setCustomForm({ ...customForm, tipoMaquina: t })}
+              placeholder="Ex: Empilhadeira elétrica, Reach Stacker..."
+              placeholderTextColor={Colors.textLight}
+            />
+
+            <Text style={styles.label}>Capacidade de carga</Text>
+            <TextInput
+              style={styles.input}
+              value={customForm.capacidadeCarga}
+              onChangeText={(t) => setCustomForm({ ...customForm, capacidadeCarga: t })}
+              placeholder="Ex: 2,5 toneladas"
+              placeholderTextColor={Colors.textLight}
+            />
+
+            <Text style={styles.label}>Elevação necessária</Text>
+            <TextInput
+              style={styles.input}
+              value={customForm.elevacaoNecessaria}
+              onChangeText={(t) => setCustomForm({ ...customForm, elevacaoNecessaria: t })}
+              placeholder="Ex: 6 metros"
+              placeholderTextColor={Colors.textLight}
+            />
+
+            <Text style={styles.label}>Prazo de locação <Text style={styles.required}>*</Text></Text>
+            <View style={styles.dateRow}>
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>De</Text>
+                <TextInput
+                  style={styles.dateInput}
+                  value={customForm.dataInicio}
+                  onChangeText={(t) => setCustomForm({ ...customForm, dataInicio: t })}
+                  placeholder="dd/mm/aaaa"
+                  placeholderTextColor={Colors.textLight}
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+              </View>
+              <View style={styles.dateSeparator}>
+                <Text style={styles.dateSeparatorText}>→</Text>
+              </View>
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>Até</Text>
+                <TextInput
+                  style={styles.dateInput}
+                  value={customForm.dataFim}
+                  onChangeText={(t) => setCustomForm({ ...customForm, dataFim: t })}
+                  placeholder="dd/mm/aaaa"
+                  placeholderTextColor={Colors.textLight}
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.label}>Descrição do local e observações</Text>
+            <TextInput
+              style={styles.textArea}
+              value={customForm.descricao}
+              onChangeText={(t) => setCustomForm({ ...customForm, descricao: t })}
+              placeholder="Descreva o local de uso, condições do piso, altura do galpão, acesso, necessidades especiais..."
+              placeholderTextColor={Colors.textLight}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.submitButton, isSubmittingCustom && styles.submitButtonDisabled]}
+              onPress={handleSubmitCustomRequest}
+              disabled={isSubmittingCustom}
+            >
+              {isSubmittingCustom ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.submitButtonText}>Enviar Solicitação</Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Admin edit/create Modal */}
       <Modal
         visible={isModalVisible}
         animationType="slide"
@@ -273,17 +472,18 @@ export default function RentalScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {editingOffer ? 'Editar Oferta' : 'Nova Oferta'}
-            </Text>
             <TouchableOpacity
               onPress={() => {
                 setIsModalVisible(false);
                 resetForm();
               }}
             >
-              <Text style={styles.cancelButton}>Cancelar</Text>
+              <X size={22} color={Colors.textDarkLight} />
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {editingOffer ? 'Editar Oferta' : 'Nova Oferta'}
+            </Text>
+            <View style={{ width: 22 }} />
           </View>
 
           <ScrollView style={styles.form}>
@@ -345,22 +545,22 @@ export default function RentalScreen() {
                     placeholder="Ex: https://exemplo.com/imagem.jpg"
                     placeholderTextColor={Colors.textDarkLight}
                   />
-                  {formData.imageUrl && (
+                  {formData.imageUrl ? (
                     <TouchableOpacity
                       style={styles.clearImageButton}
                       onPress={() => setFormData({ ...formData, imageUrl: '' })}
                     >
                       <X size={20} color={Colors.textLight} />
                     </TouchableOpacity>
-                  )}
+                  ) : null}
                 </View>
-                {formData.imageUrl && (
+                {formData.imageUrl ? (
                   <Image
                     source={{ uri: formData.imageUrl }}
                     style={styles.imagePreview}
                     contentFit="cover"
                   />
-                )}
+                ) : null}
               </>
             )}
 
@@ -396,6 +596,47 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+    paddingBottom: 32,
+  },
+  customRequestBanner: {
+    backgroundColor: Colors.area.locacao,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+    shadowColor: Colors.area.locacao,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  customRequestIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  customRequestTextWrap: {
+    flex: 1,
+  },
+  customRequestTitle: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#fff',
+    marginBottom: 2,
+  },
+  customRequestSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  customRequestArrow: {
+    fontSize: 24,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '300' as const,
   },
   offerCard: {
     backgroundColor: Colors.lightSurface,
@@ -447,7 +688,7 @@ const styles = StyleSheet.create({
   offerPrice: {
     fontSize: 14,
     fontWeight: '600' as const,
-    color: Colors.primary,
+    color: Colors.area.locacao,
   },
   actions: {
     flexDirection: 'row' as const,
@@ -466,7 +707,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
   },
   requestButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.area.locacao,
     flexDirection: 'row' as const,
     gap: 6,
     paddingHorizontal: 12,
@@ -498,7 +739,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.lightSurface,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.textDark,
   },
@@ -509,6 +750,17 @@ const styles = StyleSheet.create({
   form: {
     flex: 1,
     padding: 16,
+  },
+  formSectionNote: {
+    fontSize: 13,
+    color: Colors.textLight,
+    marginBottom: 20,
+    lineHeight: 18,
+    backgroundColor: Colors.lightSurface,
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.area.locacao,
   },
   imageInputContainer: {
     position: 'relative' as const,
@@ -525,28 +777,79 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: Colors.textDarkLight,
     marginBottom: 8,
-    marginTop: 16,
+    marginTop: 20,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  required: {
+    color: Colors.primary,
   },
   input: {
     backgroundColor: Colors.lightSurface,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 15,
     color: Colors.textDark,
     borderWidth: 1,
     borderColor: Colors.lightBorder,
   },
+  dateRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  dateField: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: Colors.textLight,
+    marginBottom: 6,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  dateInput: {
+    backgroundColor: Colors.lightSurface,
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 15,
+    color: Colors.textDark,
+    borderWidth: 1,
+    borderColor: Colors.lightBorder,
+    textAlign: 'center' as const,
+  },
+  dateSeparator: {
+    paddingTop: 22,
+    alignItems: 'center' as const,
+  },
+  dateSeparatorText: {
+    fontSize: 18,
+    color: Colors.area.locacao,
+    fontWeight: '600' as const,
+  },
+  textArea: {
+    backgroundColor: Colors.lightSurface,
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 15,
+    color: Colors.textDark,
+    borderWidth: 1,
+    borderColor: Colors.lightBorder,
+    minHeight: 120,
+    textAlignVertical: 'top' as const,
+  },
   submitButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
+    backgroundColor: Colors.area.locacao,
+    borderRadius: 12,
     padding: 16,
     alignItems: 'center' as const,
-    marginTop: 24,
-    marginBottom: 32,
+    marginTop: 28,
+    marginBottom: 40,
   },
   submitButtonDisabled: {
     opacity: 0.6,
