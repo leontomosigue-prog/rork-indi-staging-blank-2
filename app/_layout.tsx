@@ -7,10 +7,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AppStateProvider } from "@/contexts/AppStateContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
+import { MockDataProvider } from "@/contexts/MockDataContext";
 import { trpc, trpcClient } from "@/lib/trpc";
 import Colors from "@/constants/Colors";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
@@ -22,7 +23,7 @@ function RootLayoutNav() {
         if (!isLoading) {
             console.log('RootLayout: Auth loaded, hiding splash');
             setIsReady(true);
-            SplashScreen.hideAsync();
+            void SplashScreen.hideAsync();
         }
     }, [isLoading]);
 
@@ -65,7 +66,9 @@ export default function RootLayout() {
                     <AppStateProvider>
                         <AuthProvider>
                             <DataProvider>
-                                <RootLayoutNav />
+                                <MockDataProvider>
+                                    <RootLayoutNav />
+                                </MockDataProvider>
                             </DataProvider>
                         </AuthProvider>
                     </AppStateProvider>
