@@ -157,7 +157,7 @@ export default function RentalScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.nome || !formData.marca || !formData.modelo || !formData.diaria || !formData.mensal) {
+    if (!formData.marca || !formData.modelo || !formData.diaria || !formData.mensal) {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
@@ -173,7 +173,7 @@ export default function RentalScreen() {
     try {
       if (editingOffer) {
         await atualizarMaquina(editingOffer, {
-          nome: formData.nome,
+          nome: `${formData.marca} ${formData.modelo}`,
           marca: formData.marca,
           modelo: formData.modelo,
           diaria,
@@ -183,7 +183,7 @@ export default function RentalScreen() {
       } else {
         await criarMaquina({
           tipo: 'locacao',
-          nome: formData.nome,
+          nome: `${formData.marca} ${formData.modelo}`,
           marca: formData.marca,
           modelo: formData.modelo,
           diaria,
@@ -691,15 +691,6 @@ export default function RentalScreen() {
           </View>
 
           <ScrollView style={styles.form}>
-            <Text style={styles.label}>Nome</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.nome}
-              onChangeText={(text) => setFormData({ ...formData, nome: text })}
-              placeholder="Ex: Empilhadeira para Locação"
-              placeholderTextColor={Colors.textDarkLight}
-            />
-
             <Text style={styles.label}>Marca</Text>
             <TextInput
               style={styles.input}
