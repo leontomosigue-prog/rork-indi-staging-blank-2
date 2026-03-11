@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,10 +24,21 @@ import {
   Copy,
   ClipboardList,
   KeyRound,
+  PlayCircle,
+  ChevronRight,
+  AlertTriangle,
+  Zap,
+  Package,
+  ShoppingCart,
+  Wrench,
+  Truck,
+  Inbox,
+  CheckSquare,
 } from 'lucide-react-native';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
+import type { Role } from '@/types';
 
 type RequestStatus = 'pending' | 'approved' | 'rejected';
 type RequestMethod = 'email' | 'phone' | 'cpf';
@@ -77,7 +88,62 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   rejected: 'Rejeitado',
 };
 
-function formatDate(date: Date) {
+const TYPE_LABELS: Record<string, string> = {
+  sales_quote: 'Orçamento de Venda',
+  rental_request: 'Pedido de Locação',
+  service: 'Assistência Técnica',
+  parts_request: 'Pedido de Peças',
+};
+
+const TYPE_ICONS: Record<string, typeof ShoppingCart> = {
+  sales_quote: ShoppingCart,
+  rental_request: Truck,
+  service: Wrench,
+  parts_request: Package,
+};
+
+const AREA_LABELS: Record<string, string> = {
+  vendas: 'Vendas',
+  locacao: 'Locação',
+  assistencia: 'Assistência Técnica',
+  pecas: 'Peças',
+};
+
+const AREA_COLORS: Record<string, string> = {
+  vendas: '#007AFF',
+  locacao: '#5856D6',
+  assistencia: '#FF9500',
+  pecas: '#34C759',
+};
+
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: typeof Zap }> = {
+  preventiva: { label: 'Preventiva', color: '#34C759', icon: CheckCircle },
+  urgente: { label: 'Urgente', color: '#FF9500', icon: AlertTriangle },
+  para_ontem: { label: 'Para Ontem', color: '#FF3B30', icon: Zap },
+};
+
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  aberto: 'Aberto',
+  em_andamento: 'Em Andamento',
+  resolvido: 'Resolvido',
+  arquivado: 'Arquivado',
+};
+
+const TICKET_STATUS_COLORS: Record<string, string> = {
+  aberto: '#FF9500',
+  em_andamento: '#007AFF',
+  resolvido: '#34C759',
+  arquivado: 'rgba(255,255,255,0.3)',
+};
+
+const ROLE_AREA_MAP: Partial<Record<Role, 'vendas' | 'locacao' | 'assistencia' | 'pecas'>> = {
+  'Vendas': 'vendas',
+  'Locação': 'locacao',
+  'Assistência Técnica': 'assistencia',
+  'Peças': 'pecas',
+};
+
+function formatDate(date: Date | string) {
   const d = new Date(date);
   return d.toLocaleString('pt-BR', {
     day: '2-digit',
@@ -88,13 +154,506 @@ function formatDate(date: Date) {
   });
 }
 
-function ChamadosTab() {
+function TicketCard({
+  ticket,
+  onTake,
+  isTaking,
+  showArea = false,
+}: {
+  ticket: any;
+  onTake?: () => void;
+  isTaking?: boolean;
+  showArea?: boolean;
+}) {
+  const TypeIcon = TYPE_ICONS[ticket.type] ?? ClipboardList;
+  const priority = ticket.priority ? PRIORITY_CONFIG[ticket.priority] : null;
+  const areaColor = AREA_COLORS[ticket.area] ?? '#FF0000';
+  const statusColor = TICKET_STATUS_COLORS[ticket.status] ?? 'rgba(255,255,255,0.3)';
+
   return (
-    <View style={styles.placeholderContainer}>
-      <ClipboardList size={56} color="rgba(255,255,255,0.1)" />
-      <Text style={styles.placeholderTitle}>Chamados</Text>
-      <Text style={styles.placeholderSubtitle}>Lista de chamados em breve</Text>
+    <View style={cardStyles.card}>
+      <View style={[cardStyles.areaStrip, { backgroundColor: areaColor }]} />
+
+      <View style={cardStyles.body}>
+        <View style={cardStyles.topRow}>
+          <View style={cardStyles.typeRow}>
+            <View style={[cardStyles.iconBox, { backgroundColor: `${areaColor}20` }]}>
+              <TypeIcon size={14} color={areaColor} />
+            </View>
+            <Text style={cardStyles.typeText}>{TYPE_LABELS[ticket.type] ?? ticket.type}</Text>
+          </View>
+          <Text style={cardStyles.dateText}>{formatDate(ticket.createdAt)}</Text>
+        </View>
+
+        <Text style={cardStyles.customerName}>{ticket.customerName ?? 'Cliente'}</Text>
+        {ticket.customerEmail && (
+          <Text style={cardStyles.customerEmail}>{ticket.customerEmail}</Text>
+        )}
+
+        <View style={cardStyles.badgeRow}>
+          {showArea && (
+            <View style={[cardStyles.badge, { backgroundColor: `${areaColor}18`, borderColor: `${areaColor}40` }]}>
+              <Text style={[cardStyles.badgeText, { color: areaColor }]}>{AREA_LABELS[ticket.area] ?? ticket.area}</Text>
+            </View>
+          )}
+
+          {priority && (
+            <View style={[cardStyles.badge, { backgroundColor: `${priority.color}18`, borderColor: `${priority.color}40` }]}>
+              <Text style={[cardStyles.badgeText, { color: priority.color }]}>{priority.label}</Text>
+            </View>
+          )}
+
+          {ticket.status && !onTake && (
+            <View style={[cardStyles.badge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}40` }]}>
+              <View style={[cardStyles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[cardStyles.badgeText, { color: statusColor }]}>{TICKET_STATUS_LABELS[ticket.status] ?? ticket.status}</Text>
+            </View>
+          )}
+        </View>
+
+        {ticket.payload?.description && (
+          <Text style={cardStyles.description} numberOfLines={2}>
+            {ticket.payload.description}
+          </Text>
+        )}
+
+        {onTake && (
+          <Pressable
+            style={[cardStyles.takeBtn, isTaking && cardStyles.takeBtnDisabled]}
+            onPress={onTake}
+            disabled={isTaking}
+          >
+            {isTaking ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <PlayCircle size={15} color="#FFFFFF" />
+                <Text style={cardStyles.takeBtnText}>Atender Pedido</Text>
+                <ChevronRight size={14} color="rgba(255,255,255,0.7)" />
+              </>
+            )}
+          </Pressable>
+        )}
+
+        {!onTake && ticket.assigneeId && (
+          <View style={cardStyles.assignedBanner}>
+            <CheckSquare size={13} color="#007AFF" />
+            <Text style={cardStyles.assignedBannerText}>Em atendimento por você</Text>
+          </View>
+        )}
+      </View>
     </View>
+  );
+}
+
+const cardStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#262626',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#333333',
+    flexDirection: 'row' as const,
+    overflow: 'hidden' as const,
+    marginBottom: 12,
+  },
+  areaStrip: {
+    width: 4,
+  },
+  body: {
+    flex: 1,
+    padding: 14,
+    gap: 6,
+  },
+  topRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  typeRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 7,
+    flex: 1,
+  },
+  iconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  typeText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  dateText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  customerName: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  customerEmail: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  badgeRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+    marginTop: 2,
+  },
+  badge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  description: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  takeBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 9,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 8,
+  },
+  takeBtnDisabled: {
+    opacity: 0.6,
+  },
+  takeBtnText: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  assignedBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,122,255,0.25)',
+  },
+  assignedBannerText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#007AFF',
+  },
+});
+
+function SectionHeader({ title, count }: { title: string; count: number }) {
+  return (
+    <View style={sectionStyles.header}>
+      <Text style={sectionStyles.title}>{title}</Text>
+      {count > 0 && (
+        <View style={sectionStyles.countBadge}>
+          <Text style={sectionStyles.countText}>{count}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const sectionStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.8,
+  },
+  countBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 6,
+  },
+  countText: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+});
+
+function EmptyState({ icon: Icon, title, subtitle }: { icon: typeof Inbox; title: string; subtitle: string }) {
+  return (
+    <View style={emptyStyles.container}>
+      <Icon size={44} color="rgba(255,255,255,0.1)" />
+      <Text style={emptyStyles.title}>{title}</Text>
+      <Text style={emptyStyles.subtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+const emptyStyles = StyleSheet.create({
+  container: {
+    alignItems: 'center' as const,
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+    gap: 10,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center' as const,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.2)',
+    textAlign: 'center' as const,
+    lineHeight: 18,
+  },
+});
+
+function ChamadosTab() {
+  const { user } = useAuth();
+
+  const employeeArea = useMemo(() => {
+    if (!user?.roles?.length) return null;
+    for (const role of user.roles) {
+      const mapped = ROLE_AREA_MAP[role as Role];
+      if (mapped) return mapped;
+    }
+    return null;
+  }, [user?.roles]);
+
+  const isAdminUser = user?.roles?.includes('Admin') ?? false;
+  const isEmployee = !!employeeArea;
+  const isCustomer = !isEmployee && !isAdminUser;
+  const canSeeQueue = isEmployee || isAdminUser;
+
+  const [takingId, setTakingId] = useState<string | null>(null);
+
+  const availableQuery = trpc.tickets.listAvailable.useQuery(
+    { userId: user?.id ?? '', area: employeeArea ?? undefined },
+    {
+      enabled: !!user?.id && canSeeQueue,
+      refetchInterval: 15000,
+    }
+  );
+
+  const assignedQuery = trpc.tickets.listAssignedToMe.useQuery(
+    { userId: user?.id ?? '' },
+    {
+      enabled: !!user?.id && canSeeQueue,
+      refetchInterval: 15000,
+    }
+  );
+
+  const myTicketsQuery = trpc.tickets.listMine.useQuery(
+    { userId: user?.id ?? '' },
+    {
+      enabled: !!user?.id && isCustomer,
+    }
+  );
+
+  const utils = trpc.useUtils();
+
+  const takeMutation = trpc.tickets.take.useMutation({
+    onSuccess: () => {
+      void utils.tickets.listAvailable.invalidate();
+      void utils.tickets.listAssignedToMe.invalidate();
+      setTakingId(null);
+    },
+    onError: (err) => {
+      Alert.alert('Pedido indisponível', err.message);
+      void utils.tickets.listAvailable.invalidate();
+      setTakingId(null);
+    },
+  });
+
+  const handleTakeTicket = (ticketId: string, customerName: string) => {
+    if (!user?.id) return;
+    Alert.alert(
+      'Atender Pedido',
+      `Assumir atendimento de "${customerName}"?\n\nEste pedido ficará exclusivo para você e sumirá da fila dos outros colaboradores.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Atender',
+          style: 'default',
+          onPress: () => {
+            setTakingId(ticketId);
+            takeMutation.mutate({ userId: user.id, ticketId });
+          },
+        },
+      ]
+    );
+  };
+
+  const isRefreshing =
+    (availableQuery.isFetching && !availableQuery.isLoading) ||
+    (assignedQuery.isFetching && !assignedQuery.isLoading);
+
+  const handleRefresh = () => {
+    void availableQuery.refetch();
+    void assignedQuery.refetch();
+    void myTicketsQuery.refetch();
+  };
+
+  const available: any[] = availableQuery.data ?? [];
+  const assigned: any[] = assignedQuery.data ?? [];
+  const myTickets: any[] = myTicketsQuery.data ?? [];
+
+  const isLoading =
+    (canSeeQueue && (availableQuery.isLoading || assignedQuery.isLoading)) ||
+    (isCustomer && myTicketsQuery.isLoading);
+
+  if (!user) {
+    return (
+      <EmptyState
+        icon={User}
+        title="Não autenticado"
+        subtitle="Faça login para ver os chamados"
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Carregando chamados...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.chamadosContainer}
+      contentContainerStyle={styles.chamadosContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          tintColor={Colors.primary}
+        />
+      }
+    >
+      {canSeeQueue && (
+        <>
+          <SectionHeader
+            title={isAdminUser ? 'Pedidos Disponíveis' : `Fila — ${AREA_LABELS[employeeArea ?? ''] ?? ''}`}
+            count={available.length}
+          />
+
+          <View style={styles.listSection}>
+            {available.length === 0 ? (
+              <EmptyState
+                icon={Inbox}
+                title="Nenhum pedido na fila"
+                subtitle="Todos os pedidos foram assumidos ou não há novos pedidos no momento"
+              />
+            ) : (
+              available.map((ticket: any) => (
+                <TicketCard
+                  key={ticket.id}
+                  ticket={ticket}
+                  onTake={() => handleTakeTicket(ticket.id, ticket.customerName ?? 'Cliente')}
+                  isTaking={takingId === ticket.id}
+                  showArea={isAdminUser}
+                />
+              ))
+            )}
+          </View>
+
+          <SectionHeader
+            title="Meus Atendimentos"
+            count={assigned.length}
+          />
+
+          <View style={styles.listSection}>
+            {assigned.length === 0 ? (
+              <EmptyState
+                icon={CheckSquare}
+                title="Nenhum atendimento ativo"
+                subtitle="Quando você assumir um pedido, ele aparecerá aqui"
+              />
+            ) : (
+              assigned.map((ticket: any) => (
+                <TicketCard
+                  key={ticket.id}
+                  ticket={ticket}
+                  showArea={isAdminUser}
+                />
+              ))
+            )}
+          </View>
+        </>
+      )}
+
+      {isCustomer && (
+        <>
+          <SectionHeader
+            title="Meus Pedidos"
+            count={myTickets.length}
+          />
+
+          <View style={styles.listSection}>
+            {myTickets.length === 0 ? (
+              <EmptyState
+                icon={ClipboardList}
+                title="Nenhum pedido enviado"
+                subtitle="Seus chamados e solicitações aparecerão aqui"
+              />
+            ) : (
+              myTickets.map((ticket: any) => (
+                <TicketCard
+                  key={ticket.id}
+                  ticket={{ ...ticket, customerName: user.fullName }}
+                />
+              ))
+            )}
+          </View>
+        </>
+      )}
+
+      <Pressable style={styles.refreshBtn} onPress={handleRefresh}>
+        <RefreshCw size={13} color="rgba(255,255,255,0.3)" />
+        <Text style={styles.refreshBtnText}>Atualizar</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
@@ -495,16 +1054,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
   },
   tabBar: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     backgroundColor: '#222222',
     borderBottomWidth: 1,
     borderBottomColor: '#2E2E2E',
   },
   tabItem: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     gap: 6,
     paddingVertical: 13,
     borderBottomWidth: 2,
@@ -527,8 +1086,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     minWidth: 18,
     height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     paddingHorizontal: 5,
   },
   tabBadgeText: {
@@ -536,21 +1095,36 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
-  placeholderContainer: {
+  chamadosContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    padding: 32,
   },
-  placeholderTitle: {
-    fontSize: 20,
-    fontWeight: '600' as const,
-    color: 'rgba(255,255,255,0.3)',
+  chamadosContent: {
+    paddingBottom: 32,
   },
-  placeholderSubtitle: {
+  listSection: {
+    paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 16,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
-    color: 'rgba(255,255,255,0.2)',
+  },
+  refreshBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  refreshBtnText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.3)',
   },
   senhasContainer: {
     flex: 1,
@@ -564,14 +1138,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2E2E2E',
   },
   senhasHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
     marginBottom: 12,
   },
   senhasHeaderTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 7,
   },
   senhasHeaderTitle: {
@@ -593,7 +1167,7 @@ const styles = StyleSheet.create({
     color: '#FF9500',
   },
   filtersScroll: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
   },
   filterChip: {
     paddingHorizontal: 14,
@@ -624,17 +1198,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 40,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    gap: 16,
-  },
-  loadingText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 14,
-  },
   emptyContainer: {
-    alignItems: 'center',
+    alignItems: 'center' as const,
     paddingVertical: 60,
     gap: 12,
   },
@@ -656,19 +1221,19 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'flex-start' as const,
     marginBottom: 12,
   },
   cardMethodRow: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     gap: 7,
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
   methodBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 5,
     paddingHorizontal: 9,
     paddingVertical: 4,
@@ -679,8 +1244,8 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 5,
     paddingHorizontal: 9,
     paddingVertical: 4,
@@ -704,8 +1269,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 8,
   },
   cardRowLabel: {
@@ -740,8 +1305,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(52,199,89,0.2)',
   },
   tempPasswordHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 6,
     marginBottom: 8,
   },
@@ -750,9 +1315,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
   },
   tempPasswordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
   },
   tempPasswordText: {
     fontSize: 16,
@@ -788,15 +1353,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardActions: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     gap: 10,
     marginTop: 4,
   },
   actionBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     gap: 6,
     paddingVertical: 11,
     borderRadius: 10,
@@ -819,22 +1384,10 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#FFFFFF',
   },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 16,
-    marginTop: 4,
-  },
-  refreshBtnText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.3)',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-end' as const,
   },
   modalCard: {
     backgroundColor: '#262626',
@@ -846,8 +1399,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 12,
     marginBottom: 16,
   },
@@ -902,14 +1455,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalActions: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     gap: 12,
   },
   modalCancelBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: 'center' as const,
     backgroundColor: '#333333',
   },
   modalCancelText: {
@@ -921,7 +1474,7 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
   modalConfirmApprove: {
     backgroundColor: '#34C759',
