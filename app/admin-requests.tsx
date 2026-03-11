@@ -23,7 +23,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Copy,
-  FlaskConical,
 } from 'lucide-react-native';
 import { trpc } from '@/lib/trpc';
 
@@ -95,9 +94,6 @@ export default function AdminRequestsScreen() {
     note: '',
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [testModal, setTestModal] = useState(false);
-  const [testMethod, setTestMethod] = useState<RequestMethod>('email');
-  const [testValue, setTestValue] = useState('');
 
   const { data: requests = [], isLoading, refetch, isFetching } = trpc.passwordReset.list.useQuery(undefined, {
     refetchInterval: 30000,
@@ -164,30 +160,6 @@ export default function AdminRequestsScreen() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const createTestMutation = trpc.passwordReset.create.useMutation({
-    onSuccess: (data) => {
-      void utils.passwordReset.list.invalidate();
-      setTestModal(false);
-      setTestValue('');
-      Alert.alert(
-        data.userFound ? '✅ Pedido criado' : '⚠️ Pedido criado',
-        data.userFound
-          ? 'Solicitação de teste criada! O cliente foi identificado no cadastro.'
-          : 'Solicitação criada, mas nenhum cliente foi encontrado com esses dados.',
-        [{ text: 'OK' }]
-      );
-    },
-    onError: (err) => {
-      Alert.alert('Erro', err.message);
-    },
-  });
-
-  const TEST_PLACEHOLDERS: Record<RequestMethod, string> = {
-    email: 'ex: cliente@email.com',
-    phone: 'ex: (11) 99999-9999',
-    cpf: 'ex: 123.456.789-00',
-  };
-
   const isMutating = approveMutation.isPending || rejectMutation.isPending;
 
   return (
@@ -213,14 +185,6 @@ export default function AdminRequestsScreen() {
             </View>
           )}
         </View>
-
-        <Pressable
-          style={styles.testBtn}
-          onPress={() => setTestModal(true)}
-        >
-          <FlaskConical size={13} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.testBtnText}>Criar pedido de teste</Text>
-        </Pressable>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
           {(['pending', 'approved', 'rejected', 'all'] as const).map(f => (
@@ -379,76 +343,6 @@ export default function AdminRequestsScreen() {
           <Text style={styles.refreshBtnText}>Atualizar lista</Text>
         </Pressable>
       </ScrollView>
-
-      <Modal
-        visible={testModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTestModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <FlaskConical size={24} color="rgba(255,255,255,0.6)" />
-              <Text style={styles.modalTitle}>Pedido de teste</Text>
-            </View>
-
-            <Text style={styles.testModalSubtitle}>
-              Simula uma solicitação de recuperação de senha como se viesse da tela do cliente.
-            </Text>
-
-            <Text style={styles.modalNoteLabel}>Método de recuperação</Text>
-            <View style={styles.testMethodRow}>
-              {(['email', 'phone', 'cpf'] as RequestMethod[]).map(m => (
-                <Pressable
-                  key={m}
-                  style={[styles.testMethodChip, testMethod === m && styles.testMethodChipActive]}
-                  onPress={() => { setTestMethod(m); setTestValue(''); }}
-                >
-                  <Text style={[styles.testMethodChipText, testMethod === m && styles.testMethodChipTextActive]}>
-                    {METHOD_LABELS[m]}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.modalNoteLabel}>Valor informado pelo cliente</Text>
-            <TextInput
-              style={styles.modalNoteInput}
-              placeholder={TEST_PLACEHOLDERS[testMethod]}
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={testValue}
-              onChangeText={setTestValue}
-              autoCapitalize="none"
-              keyboardType={testMethod === 'phone' ? 'phone-pad' : testMethod === 'cpf' ? 'numeric' : 'email-address'}
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.modalCancelBtn}
-                onPress={() => { setTestModal(false); setTestValue(''); }}
-                disabled={createTestMutation.isPending}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalConfirmBtn, styles.modalConfirmApprove, !testValue.trim() && styles.modalConfirmDisabled]}
-                onPress={() => {
-                  if (!testValue.trim()) return;
-                  createTestMutation.mutate({ method: testMethod, value: testValue.trim() });
-                }}
-                disabled={createTestMutation.isPending || !testValue.trim()}
-              >
-                {createTestMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalConfirmText}>Enviar solicitação</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={actionModal.visible}
@@ -818,57 +712,6 @@ const styles = StyleSheet.create({
   refreshBtnText: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.3)',
-  },
-  testBtn: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 6,
-    alignSelf: 'flex-start' as const,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 12,
-  },
-  testBtnText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '500' as const,
-  },
-  testModalSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
-    lineHeight: 19,
-    marginBottom: 20,
-  },
-  testMethodRow: {
-    flexDirection: 'row' as const,
-    gap: 8,
-    marginBottom: 16,
-  },
-  testMethodChip: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
-    alignItems: 'center' as const,
-    backgroundColor: '#1E1E1E',
-    borderWidth: 1,
-    borderColor: '#3A3A3A',
-  },
-  testMethodChipActive: {
-    backgroundColor: 'rgba(255,0,0,0.15)',
-    borderColor: '#FF0000',
-  },
-  testMethodChipText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '500' as const,
-  },
-  testMethodChipTextActive: {
-    color: '#FF0000',
-    fontWeight: '700' as const,
   },
   modalOverlay: {
     flex: 1,
