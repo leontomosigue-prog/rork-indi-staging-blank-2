@@ -18,6 +18,7 @@ console.log('   ID:', BACKEND_ID);
 console.log('   Version:', BACKEND_VERSION);
 console.log('   Build Timestamp:', BUILD_TIMESTAMP);
 console.log('   tRPC mounted at: /trpc/* (gateway adds /api prefix)');
+console.log('   Routes: users, machines, rental_offers, parts, tickets, conversations, messages, passwordReset');
 
 async function initializeData() {
   console.log('🔧 Initializing backend data...');
@@ -324,6 +325,7 @@ app.use('/trpc/*', async (c, next) => {
 app.all(
   '/trpc/*',
   trpcServer({
+    endpoint: '/trpc',
     router: appRouter,
     createContext,
   })
