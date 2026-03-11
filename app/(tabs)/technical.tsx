@@ -8,11 +8,12 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Wrench, ClipboardList, ChevronRight } from 'lucide-react-native';
+import { Wrench, ClipboardList, ChevronRight, CheckCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMockData } from '@/contexts/MockDataContext';
+import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
@@ -24,66 +25,57 @@ const PRIORITIES: { value: Priority; label: string; color: string }[] = [
   { value: 'Para Ontem', label: 'Para Ontem', color: '#ef4444' },
 ];
 
+const PRIORITY_MAP: Record<Priority, 'preventiva' | 'urgente' | 'para_ontem'> = {
+  'Preventiva': 'preventiva',
+  'Urgente': 'urgente',
+  'Para Ontem': 'para_ontem',
+};
+
 export default function TechnicalScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const {
-    criarConversa = async () => '',
-    isLoading = false,
-  } = useMockData() ?? {};
   const [priority, setPriority] = useState<Priority>('Preventiva');
   const [description, setDescription] = useState('');
   const [photo1, setPhoto1] = useState('');
   const [photo2, setPhoto2] = useState('');
   const [photo3, setPhoto3] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
+
+  const createTicketMutation = trpc.tickets.create.useMutation({
+    onSuccess: () => {
+      setDescription('');
+      setPhoto1('');
+      setPhoto2('');
+      setPhoto3('');
+      setPriority('Preventiva');
+      setSuccessVisible(true);
+    },
+    onError: (err) => {
+      Alert.alert('Erro', err.message || 'Não foi possível criar o chamado');
+    },
+  });
 
   const hasAdminOrTechnicalRole = user?.roles?.some(
     (role) => role === 'Admin' || role === 'Assistência Técnica'
   );
 
-  const handleSubmitTicket = async () => {
+  const handleSubmitTicket = () => {
     if (!description.trim()) {
       Alert.alert('Erro', 'Digite uma descrição para o chamado');
       return;
     }
-
     if (!user) return;
 
-    setIsSubmitting(true);
-    try {
-      const conversaId = await criarConversa({
-        area: 'Assistência Técnica',
-        titulo: `${priority} - ${description.slice(0, 30)}`,
-        mensagemInicial: description,
-        prioridade: priority,
-      });
-
-      if (conversaId) {
-        setDescription('');
-        setPhoto1('');
-        setPhoto2('');
-        setPhoto3('');
-        setPriority('Preventiva');
-        router.push(`/chat/${conversaId}` as any);
-      } else {
-        Alert.alert('Erro', 'Não foi possível criar o chamado');
-      }
-    } catch (error) {
-      console.error('Error creating ticket:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao criar o chamado');
-    } finally {
-      setIsSubmitting(false);
-    }
+    const photos = [photo1, photo2, photo3].filter(Boolean);
+    createTicketMutation.mutate({
+      userId: user.id,
+      type: 'service',
+      area: 'assistencia',
+      priority: PRIORITY_MAP[priority],
+      payload: { description },
+      photos: photos.length > 0 ? photos : undefined,
+    });
   };
-
-  if (isLoading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
 
   if (hasAdminOrTechnicalRole) {
     return (
@@ -123,6 +115,29 @@ export default function TechnicalScreen() {
     <ScrollView style={styles.container}>
       <Logo size={80} />
       <Stack.Screen options={{ title: 'Assistência Técnica' }} />
+
+      <Modal
+        visible={successVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuccessVisible(false)}
+      >
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            <CheckCircle size={52} color="#34C759" />
+            <Text style={styles.successTitle}>Chamado Enviado!</Text>
+            <Text style={styles.successMsg}>
+              Seu chamado de assistência técnica foi registrado. Em breve um de nossos técnicos entrará em contato.
+            </Text>
+            <TouchableOpacity
+              style={styles.successBtn}
+              onPress={() => setSuccessVisible(false)}
+            >
+              <Text style={styles.successBtnText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.formContainer}>
         <View style={styles.headerSection}>
@@ -193,11 +208,11 @@ export default function TechnicalScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          style={[styles.submitButton, createTicketMutation.isPending && styles.submitButtonDisabled]}
           onPress={handleSubmitTicket}
-          disabled={isSubmitting}
+          disabled={createTicketMutation.isPending}
         >
-          {isSubmitting ? (
+          {createTicketMutation.isPending ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.submitButtonText}>Enviar Chamado</Text>
@@ -363,6 +378,47 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: 32,
+  },
+  successCard: {
+    backgroundColor: Colors.cardBackground ?? '#1C1C1E',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center' as const,
+    gap: 14,
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  successMsg: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center' as const,
+    lineHeight: 21,
+  },
+  successBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 40,
+    marginTop: 4,
+  },
+  successBtnText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700' as const,

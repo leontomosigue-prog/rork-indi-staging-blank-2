@@ -377,9 +377,7 @@ export default function PartsScreen() {
             <Text style={styles.successTitle}>Peça Solicitada!</Text>
             <Text style={styles.successSubtitle}>
               <Text style={styles.successPartName}>{successPartName}</Text>
-              {' '}foi solicitada com sucesso.{'
-'}{'
-'}Em breve um de nossos atendentes dará continuidade ao seu atendimento.
+              {' '}foi solicitada com sucesso. Em breve um de nossos atendentes dará continuidade ao seu atendimento.
             </Text>
             <TouchableOpacity
               style={styles.successButton}
