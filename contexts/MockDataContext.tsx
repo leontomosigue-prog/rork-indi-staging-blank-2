@@ -55,6 +55,15 @@ type Peca = {
   imageUrl?: string;
 };
 
+type Comunicado = {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  autorNome: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const STORAGE_KEYS = {
   CONVERSAS: '@indi:mock:conversas',
   MENSAGENS: '@indi:mock:mensagens',
@@ -62,6 +71,7 @@ const STORAGE_KEYS = {
   PECAS: '@indi:mock:pecas',
   COLABORADORES: '@indi:mock:colaboradores',
   CLIENTES: '@indi:mock:clientes',
+  COMUNICADOS: '@indi:mock:comunicados',
 };
 
 const MOCK_MAQUINAS_VENDAS: Maquina[] = [
@@ -218,6 +228,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
   const [pecas, setPecas] = useState<Peca[]>([]);
   const [colaboradores, setColaboradores] = useState<User[]>([]);
   const [clientes, setClientes] = useState<User[]>([]);
+  const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -268,6 +279,11 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
         const clientUsers = allUsers.filter(u => u.type === 'client');
         setColaboradores(employeeUsers);
         setClientes(clientUsers);
+      }
+
+      const comunicadosString = await AsyncStorage.getItem(STORAGE_KEYS.COMUNICADOS);
+      if (comunicadosString) {
+        setComunicados(JSON.parse(comunicadosString));
       }
 
       console.log('MockDataContext: Dados carregados com sucesso');
@@ -634,6 +650,47 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     return clientes;
   }, [clientes]);
 
+  const listComunicados = useCallback((): Comunicado[] => {
+    return [...comunicados].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [comunicados]);
+
+  const criarComunicado = useCallback(async (titulo: string, conteudo: string): Promise<Comunicado | null> => {
+    if (!user) return null;
+    console.log('MockDataContext: Criando comunicado');
+    try {
+      const novo: Comunicado = {
+        id: Date.now().toString(),
+        titulo,
+        conteudo,
+        autorNome: user.fullName,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const updated = [novo, ...comunicados];
+      setComunicados(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.COMUNICADOS, JSON.stringify(updated));
+      return novo;
+    } catch (error) {
+      console.error('MockDataContext: Erro ao criar comunicado:', error);
+      return null;
+    }
+  }, [user, comunicados]);
+
+  const editarComunicado = useCallback(async (id: string, titulo: string, conteudo: string): Promise<boolean> => {
+    console.log('MockDataContext: Editando comunicado:', id);
+    try {
+      const updated = comunicados.map(c =>
+        c.id === id ? { ...c, titulo, conteudo, updatedAt: new Date().toISOString() } : c
+      );
+      setComunicados(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.COMUNICADOS, JSON.stringify(updated));
+      return true;
+    } catch (error) {
+      console.error('MockDataContext: Erro ao editar comunicado:', error);
+      return false;
+    }
+  }, [comunicados]);
+
   const atualizarCliente = useCallback(async (id: string, data: Partial<User>): Promise<User | null> => {
     console.log('MockDataContext: Atualizando cliente:', { id, data });
     try {
@@ -670,6 +727,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     pecas,
     colaboradores,
     clientes,
+    comunicados,
     isLoading,
     listConversasPorUsuario,
     listConversasPorArea,
@@ -692,6 +750,9 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     removerColaborador,
     listClientes,
     atualizarCliente,
+    listComunicados,
+    criarComunicado,
+    editarComunicado,
   }), [
     conversas,
     mensagens,
@@ -699,6 +760,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     pecas,
     colaboradores,
     clientes,
+    comunicados,
     isLoading,
     listConversasPorUsuario,
     listConversasPorArea,
@@ -721,5 +783,8 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     removerColaborador,
     listClientes,
     atualizarCliente,
+    listComunicados,
+    criarComunicado,
+    editarComunicado,
   ]);
 });
