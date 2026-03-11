@@ -12,10 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Stack, useRouter } from 'expo-router';
-import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X } from 'lucide-react-native';
+import { Stack } from 'expo-router';
+import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X, CheckCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
+import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
@@ -37,13 +38,11 @@ const CATEGORIES = [
 
 export default function PartsScreen() {
   const { user } = useAuth();
-  const router = useRouter();
   const {
     listPecas = () => [],
     criarPeca = async () => null,
     atualizarPeca = async () => null,
     removerPeca = async () => {},
-    criarConversa = async () => '',
     isLoading = false,
   } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -59,7 +58,18 @@ export default function PartsScreen() {
     imageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isRequesting, setIsRequesting] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successPartName, setSuccessPartName] = useState('');
+
+  const createTicketMutation = trpc.tickets.create.useMutation({
+    onSuccess: () => {
+      console.log('Ticket de peça criado com sucesso');
+    },
+    onError: (error) => {
+      console.error('Erro ao criar ticket:', error);
+      Alert.alert('Erro', 'Não foi possível criar a solicitação. Tente novamente.');
+    },
+  });
 
   const pecas = listPecas();
 
@@ -170,28 +180,36 @@ export default function PartsScreen() {
     );
   };
 
-  const handleRequestPart = async (part: any) => {
+  const handleRequestPart = (part: any) => {
     if (!user) return;
 
-    setIsRequesting(true);
-    try {
-      const conversaId = await criarConversa({
-        area: 'Peças',
-        titulo: `Peça - ${part.sku}`,
-        mensagemInicial: `Olá, gostaria de solicitar a peça ${part.nome} (SKU: ${part.sku}).`,
-      });
-
-      if (conversaId) {
-        router.push(`/chat/${conversaId}` as any);
-      } else {
-        Alert.alert('Erro', 'Não foi possível criar a solicitação');
+    console.log('Solicitando peça via ticket:', part.sku);
+    createTicketMutation.mutate(
+      {
+        userId: user.id,
+        type: 'parts_request',
+        area: 'pecas',
+        payload: {
+          description: `Solicitação de peça: ${part.nome} (SKU: ${part.sku})`,
+          parts: [
+            {
+              id: part.id,
+              nome: part.nome,
+              sku: part.sku,
+              categoria: part.categoria,
+              preco: part.preco,
+              estoque: part.estoque,
+            },
+          ],
+        },
+      },
+      {
+        onSuccess: () => {
+          setSuccessPartName(part.nome);
+          setSuccessModalVisible(true);
+        },
       }
-    } catch (error) {
-      console.error('Error requesting part:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao solicitar a peça');
-    } finally {
-      setIsRequesting(false);
-    }
+    );
   };
 
   const getCategoryLabel = (categoria: string) => {
@@ -245,10 +263,16 @@ export default function PartsScreen() {
           <TouchableOpacity
             style={[styles.actionButton, styles.requestButton]}
             onPress={() => handleRequestPart(item)}
-            disabled={isRequesting}
+            disabled={createTicketMutation.isPending}
           >
-            <Package size={18} color="#fff" />
-            <Text style={styles.requestButtonText}>Solicitar</Text>
+            {createTicketMutation.isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Package size={18} color="#fff" />
+                <Text style={styles.requestButtonText}>Solicitar</Text>
+              </>
+            )}
           </TouchableOpacity>
         ) : null}
       </View>
@@ -338,6 +362,34 @@ export default function PartsScreen() {
           </View>
         }
       />
+
+      <Modal
+        visible={successModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuccessModalVisible(false)}
+      >
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            <View style={styles.successIconWrap}>
+              <CheckCircle size={48} color="#34C759" />
+            </View>
+            <Text style={styles.successTitle}>Peça Solicitada!</Text>
+            <Text style={styles.successSubtitle}>
+              <Text style={styles.successPartName}>{successPartName}</Text>
+              {' '}foi solicitada com sucesso.{'
+'}{'
+'}Em breve um de nossos atendentes dará continuidade ao seu atendimento.
+            </Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={() => setSuccessModalVisible(false)}
+            >
+              <Text style={styles.successButtonText}>OK, entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isModalVisible}
@@ -727,6 +779,69 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: 32,
+  },
+  successCard: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center' as const,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#2C2C2E',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  successIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(52,199,89,0.12)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.25)',
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    marginBottom: 12,
+    textAlign: 'center' as const,
+  },
+  successSubtitle: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center' as const,
+    lineHeight: 22,
+    marginBottom: 28,
+  },
+  successPartName: {
+    color: '#FFFFFF',
+    fontWeight: '600' as const,
+  },
+  successButton: {
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    alignItems: 'center' as const,
+    width: '100%',
+  },
+  successButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700' as const,
   },

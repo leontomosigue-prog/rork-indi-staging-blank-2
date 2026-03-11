@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,7 +34,12 @@ import {
   Truck,
   Inbox,
   CheckSquare,
+  Building2,
+  MessageSquare,
+  Scissors,
+  Square,
 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
@@ -448,6 +453,7 @@ const emptyStyles = StyleSheet.create({
 
 function ChamadosTab() {
   const { user } = useAuth();
+  const router = useRouter();
 
   const employeeArea = useMemo(() => {
     if (!user?.roles?.length) return null;
@@ -464,6 +470,12 @@ function ChamadosTab() {
   const canSeeQueue = isEmployee || isAdminUser;
 
   const [takingId, setTakingId] = useState<string | null>(null);
+  const pendingTicketRef = useRef<any>(null);
+  const [detailsTicket, setDetailsTicket] = useState<any>(null);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [partsVisible, setPartsVisible] = useState(false);
+  const [checkedParts, setCheckedParts] = useState<Record<string, boolean>>({});
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   const availableQuery = trpc.tickets.listAvailable.useQuery(
     { userId: user?.id ?? '', area: employeeArea ?? undefined },
@@ -494,32 +506,51 @@ function ChamadosTab() {
     onSuccess: () => {
       void utils.tickets.listAvailable.invalidate();
       void utils.tickets.listAssignedToMe.invalidate();
+      const ticket = pendingTicketRef.current;
       setTakingId(null);
+      if (ticket) {
+        setDetailsTicket(ticket);
+        setCheckedParts({});
+        setDetailsVisible(true);
+        pendingTicketRef.current = null;
+      }
     },
     onError: (err) => {
       Alert.alert('Pedido indisponível', err.message);
       void utils.tickets.listAvailable.invalidate();
       setTakingId(null);
+      pendingTicketRef.current = null;
     },
   });
 
-  const handleTakeTicket = (ticketId: string, customerName: string) => {
+  const createConversationMutation = trpc.conversations.createForTicket.useMutation({
+    onSuccess: (conversation) => {
+      setIsCreatingConversation(false);
+      setDetailsVisible(false);
+      setPartsVisible(false);
+      router.push(`/chat/${conversation.id}` as any);
+    },
+    onError: (err) => {
+      setIsCreatingConversation(false);
+      Alert.alert('Erro', err.message || 'Não foi possível iniciar o chat');
+    },
+  });
+
+  const handleTakeTicket = (ticket: any) => {
     if (!user?.id) return;
-    Alert.alert(
-      'Atender Pedido',
-      `Assumir atendimento de "${customerName}"?\n\nEste pedido ficará exclusivo para você e sumirá da fila dos outros colaboradores.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Atender',
-          style: 'default',
-          onPress: () => {
-            setTakingId(ticketId);
-            takeMutation.mutate({ userId: user.id, ticketId });
-          },
-        },
-      ]
-    );
+    pendingTicketRef.current = ticket;
+    setTakingId(ticket.id);
+    takeMutation.mutate({ userId: user.id, ticketId: ticket.id });
+  };
+
+  const handleContinueToChat = () => {
+    if (!user?.id || !detailsTicket) return;
+    setIsCreatingConversation(true);
+    createConversationMutation.mutate({ userId: user.id, ticketId: detailsTicket.id });
+  };
+
+  const togglePartCheck = (partId: string) => {
+    setCheckedParts(prev => ({ ...prev, [partId]: !prev[partId] }));
   };
 
   const isRefreshing =
@@ -560,8 +591,9 @@ function ChamadosTab() {
   }
 
   return (
+    <View style={styles.chamadosContainer}>
     <ScrollView
-      style={styles.chamadosContainer}
+      style={{ flex: 1 }}
       contentContainerStyle={styles.chamadosContent}
       refreshControl={
         <RefreshControl
@@ -590,7 +622,7 @@ function ChamadosTab() {
                 <TicketCard
                   key={ticket.id}
                   ticket={ticket}
-                  onTake={() => handleTakeTicket(ticket.id, ticket.customerName ?? 'Cliente')}
+                  onTake={() => handleTakeTicket(ticket)}
                   isTaking={takingId === ticket.id}
                   showArea={isAdminUser}
                 />
@@ -654,6 +686,203 @@ function ChamadosTab() {
         <Text style={styles.refreshBtnText}>Atualizar</Text>
       </Pressable>
     </ScrollView>
+
+    {/* Details Modal */}
+    <Modal
+      visible={detailsVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setDetailsVisible(false)}
+    >
+      <View style={detailModalStyles.overlay}>
+        <View style={detailModalStyles.sheet}>
+          <View style={detailModalStyles.handle} />
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={detailModalStyles.header}>
+              <View style={detailModalStyles.headerLeft}>
+                <View style={detailModalStyles.typeIconBox}>
+                  <Package size={20} color="#34C759" />
+                </View>
+                <View>
+                  <Text style={detailModalStyles.headerTitle}>
+                    {TYPE_LABELS[detailsTicket?.type] ?? detailsTicket?.type ?? 'Pedido'}
+                  </Text>
+                  <Text style={detailModalStyles.headerSub}>Pedido assumido por você</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setDetailsVisible(false)} style={detailModalStyles.closeBtn}>
+                <Text style={detailModalStyles.closeBtnText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={detailModalStyles.section}>
+              <View style={detailModalStyles.sectionHeader}>
+                <User size={14} color="rgba(255,255,255,0.4)" />
+                <Text style={detailModalStyles.sectionTitle}>Dados do Cliente</Text>
+              </View>
+              <View style={detailModalStyles.infoCard}>
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Nome</Text>
+                  <Text style={detailModalStyles.infoValue}>{detailsTicket?.customerName ?? '—'}</Text>
+                </View>
+                {detailsTicket?.customerEmail && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>E-mail</Text>
+                    <Text style={detailModalStyles.infoValue}>{detailsTicket.customerEmail}</Text>
+                  </View>
+                )}
+                {detailsTicket?.customerCpf && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>CPF</Text>
+                    <Text style={detailModalStyles.infoValue}>{detailsTicket.customerCpf}</Text>
+                  </View>
+                )}
+                {detailsTicket?.customerCompanyName && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>Empresa</Text>
+                    <Text style={detailModalStyles.infoValue}>{detailsTicket.customerCompanyName}</Text>
+                  </View>
+                )}
+                {detailsTicket?.customerCnpj && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>CNPJ</Text>
+                    <Text style={detailModalStyles.infoValue}>{detailsTicket.customerCnpj}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={detailModalStyles.section}>
+              <View style={detailModalStyles.sectionHeader}>
+                <ClipboardList size={14} color="rgba(255,255,255,0.4)" />
+                <Text style={detailModalStyles.sectionTitle}>Detalhes do Pedido</Text>
+              </View>
+              <View style={detailModalStyles.infoCard}>
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Tipo</Text>
+                  <Text style={detailModalStyles.infoValue}>{TYPE_LABELS[detailsTicket?.type] ?? '—'}</Text>
+                </View>
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Área</Text>
+                  <Text style={detailModalStyles.infoValue}>{AREA_LABELS[detailsTicket?.area] ?? '—'}</Text>
+                </View>
+                {detailsTicket?.priority && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>Prioridade</Text>
+                    <Text style={[detailModalStyles.infoValue, { color: PRIORITY_CONFIG[detailsTicket.priority]?.color ?? '#fff' }]}>
+                      {PRIORITY_CONFIG[detailsTicket.priority]?.label ?? detailsTicket.priority}
+                    </Text>
+                  </View>
+                )}
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Data</Text>
+                  <Text style={detailModalStyles.infoValue}>{formatDate(detailsTicket?.createdAt)}</Text>
+                </View>
+                {detailsTicket?.payload?.description && (
+                  <View style={[detailModalStyles.infoRow, { flexDirection: 'column', gap: 6 }]}>
+                    <Text style={detailModalStyles.infoLabel}>Descrição</Text>
+                    <Text style={[detailModalStyles.infoValue, { lineHeight: 20 }]}>
+                      {detailsTicket.payload.description}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={detailModalStyles.actions}>
+              {detailsTicket?.type === 'parts_request' && detailsTicket?.payload?.parts?.length > 0 && (
+                <Pressable
+                  style={detailModalStyles.separationBtn}
+                  onPress={() => setPartsVisible(true)}
+                >
+                  <Scissors size={16} color="#FF9500" />
+                  <Text style={detailModalStyles.separationBtnText}>Iniciar Separação de Peças</Text>
+                </Pressable>
+              )}
+              <Pressable
+                style={[detailModalStyles.continueBtn, isCreatingConversation && detailModalStyles.continueBtnDisabled]}
+                onPress={handleContinueToChat}
+                disabled={isCreatingConversation}
+              >
+                {isCreatingConversation ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MessageSquare size={16} color="#FFFFFF" />
+                    <Text style={detailModalStyles.continueBtnText}>Continuar</Text>
+                    <ChevronRight size={14} color="rgba(255,255,255,0.7)" />
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+
+    {/* Parts Checklist Modal */}
+    <Modal
+      visible={partsVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setPartsVisible(false)}
+    >
+      <View style={detailModalStyles.overlay}>
+        <View style={[detailModalStyles.sheet, { maxHeight: '75%' }]}>
+          <View style={detailModalStyles.handle} />
+
+          <View style={partsModalStyles.header}>
+            <View style={partsModalStyles.headerLeft}>
+              <Package size={18} color="#34C759" />
+              <Text style={partsModalStyles.headerTitle}>Separação de Peças</Text>
+            </View>
+            <Text style={partsModalStyles.headerCount}>
+              {Object.values(checkedParts).filter(Boolean).length} / {detailsTicket?.payload?.parts?.length ?? 0}
+            </Text>
+          </View>
+
+          <ScrollView style={partsModalStyles.list} contentContainerStyle={{ paddingBottom: 20 }}>
+            {(detailsTicket?.payload?.parts ?? []).map((part: any, index: number) => {
+              const partKey = part.id ?? `part-${index}`;
+              const isChecked = !!checkedParts[partKey];
+              return (
+                <Pressable
+                  key={partKey}
+                  style={[partsModalStyles.partRow, isChecked && partsModalStyles.partRowChecked]}
+                  onPress={() => togglePartCheck(partKey)}
+                >
+                  <View style={[partsModalStyles.checkbox, isChecked && partsModalStyles.checkboxChecked]}>
+                    {isChecked && <CheckCircle size={16} color="#FFFFFF" />}
+                    {!isChecked && <Square size={16} color="rgba(255,255,255,0.3)" />}
+                  </View>
+                  <View style={partsModalStyles.partInfo}>
+                    <Text style={[partsModalStyles.partName, isChecked && partsModalStyles.partNameChecked]}>
+                      {part.nome ?? part.name ?? '—'}
+                    </Text>
+                    <Text style={partsModalStyles.partSku}>SKU: {part.sku ?? '—'}</Text>
+                  </View>
+                  {part.preco != null && (
+                    <Text style={partsModalStyles.partPrice}>
+                      R$ {Number(part.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Pressable
+            style={partsModalStyles.concludeBtn}
+            onPress={() => setPartsVisible(false)}
+          >
+            <CheckCircle size={16} color="#FFFFFF" />
+            <Text style={partsModalStyles.concludeBtnText}>Concluir</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+    </View>
   );
 }
 
@@ -1486,6 +1715,257 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   modalConfirmText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+});
+
+const detailModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end' as const,
+  },
+  sheet: {
+    backgroundColor: '#1E1E1E',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '90%',
+    borderWidth: 1,
+    borderColor: '#2E2E2E',
+    borderBottomWidth: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center' as const,
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 20,
+  },
+  headerLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+    flex: 1,
+  },
+  typeIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(52,199,89,0.12)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.25)',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  headerSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  closeBtnText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
+    lineHeight: 18,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.8,
+  },
+  infoCard: {
+    backgroundColor: '#262626',
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  infoRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'flex-start' as const,
+    gap: 12,
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    minWidth: 70,
+  },
+  infoValue: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '500' as const,
+    flex: 1,
+    textAlign: 'right' as const,
+  },
+  actions: {
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  separationBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    backgroundColor: 'rgba(255,149,0,0.1)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,149,0,0.3)',
+  },
+  separationBtnText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#FF9500',
+  },
+  continueBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 15,
+  },
+  continueBtnDisabled: {
+    opacity: 0.6,
+  },
+  continueBtnText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    flex: 1,
+    textAlign: 'center' as const,
+  },
+});
+
+const partsModalStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 16,
+    paddingTop: 4,
+  },
+  headerLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  headerCount: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#34C759',
+    backgroundColor: 'rgba(52,199,89,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.25)',
+  },
+  list: {
+    flex: 1,
+  },
+  partRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+    backgroundColor: '#262626',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  partRowChecked: {
+    borderColor: 'rgba(52,199,89,0.35)',
+    backgroundColor: 'rgba(52,199,89,0.06)',
+  },
+  checkbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  checkboxChecked: {
+    backgroundColor: '#34C759',
+  },
+  partInfo: {
+    flex: 1,
+  },
+  partName: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
+  },
+  partNameChecked: {
+    color: 'rgba(255,255,255,0.5)',
+    textDecorationLine: 'line-through' as const,
+  },
+  partSku: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+  },
+  partPrice: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#34C759',
+  },
+  concludeBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  concludeBtnText: {
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',

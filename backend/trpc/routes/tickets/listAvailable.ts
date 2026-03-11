@@ -34,6 +34,9 @@ export default publicProcedure
         ...t,
         customerName: customer?.name ?? "Cliente",
         customerEmail: customer?.email,
+        customerCpf: customer?.cpf,
+        customerCompanyName: customer?.companyName,
+        customerCnpj: customer?.cnpj,
       };
     });
   });
