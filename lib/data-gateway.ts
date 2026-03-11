@@ -836,7 +836,7 @@ class DataGateway {
         return { status: 'error', errorCode: 'EMAIL_EXISTS', errorMessage: 'E-mail já cadastrado' };
       }
 
-      const novoColaborador: User = {
+      const novoColaborador: any = {
         id: Date.now().toString(),
         type: 'employee',
         email: data.email,
@@ -846,6 +846,7 @@ class DataGateway {
         lgpdConsentDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        _passwordHash: data.password,
       };
 
       users.push(novoColaborador);
