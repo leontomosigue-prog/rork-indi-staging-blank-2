@@ -542,26 +542,42 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
   }): Promise<User | null> => {
     console.log('MockDataContext: Criando colaborador:', data);
     try {
-      const novoColaborador: User = {
-        id: Date.now().toString(),
+      const id = Date.now().toString();
+      const now = new Date().toISOString();
+
+      const novoColaboradorRecord: any = {
+        id,
         type: 'employee',
         email: data.email,
         fullName: data.fullName,
         roles: data.roles,
         lgpdConsent: true,
-        lgpdConsentDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        lgpdConsentDate: now,
+        createdAt: now,
+        updatedAt: now,
+        _passwordHash: data.password,
+      };
+
+      const novoColaborador: User = {
+        id,
+        type: 'employee',
+        email: data.email,
+        fullName: data.fullName,
+        roles: data.roles,
+        lgpdConsent: true,
+        lgpdConsentDate: now,
+        createdAt: now,
+        updatedAt: now,
       };
 
       const usersDbString = await AsyncStorage.getItem('@indi:usersDb');
-      const allUsers: User[] = usersDbString ? JSON.parse(usersDbString) : [];
-      allUsers.push(novoColaborador);
+      const allUsers: any[] = usersDbString ? JSON.parse(usersDbString) : [];
+      allUsers.push(novoColaboradorRecord);
       await AsyncStorage.setItem('@indi:usersDb', JSON.stringify(allUsers));
 
       const updatedColaboradores = [...colaboradores, novoColaborador];
       setColaboradores(updatedColaboradores);
-      console.log('MockDataContext: Colaborador criado com sucesso');
+      console.log('MockDataContext: Colaborador criado com sucesso, senha salva');
       return novoColaborador;
     } catch (error) {
       console.error('MockDataContext: Erro ao criar colaborador:', error);
