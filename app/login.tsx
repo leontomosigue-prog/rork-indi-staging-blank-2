@@ -94,7 +94,7 @@ export default function LoginScreen() {
               <Text style={styles.errorText}>{errorState.errorMessage || 'Erro ao fazer login'}</Text>
             ) : null}
 
-            <Pressable onPress={() => Alert.alert('Recuperar Senha', 'Funcionalidade em desenvolvimento')}>
+            <Pressable onPress={() => router.push('/forgot-password' as any)}>
               <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
             </Pressable>
 
