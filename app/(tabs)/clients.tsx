@@ -10,15 +10,27 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { Search, X, Phone, Mail, FileText, Building2, Calendar, ChevronRight, Users } from 'lucide-react-native';
+import { Search, X, Phone, Mail, FileText, Building2, Calendar, ChevronRight, Users, Pencil, Check, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
 import type { User as UserType } from '@/types';
 
 type FilterType = 'todos' | 'pf' | 'pj';
+
+type EditForm = {
+  fullName: string;
+  email: string;
+  phone: string;
+  cpf: string;
+  cnpj: string;
+  companyName: string;
+};
 
 function formatCPF(cpf: string): string {
   const digits = cpf.replace(/\D/g, '');
@@ -65,12 +77,23 @@ export default function ClientsScreen() {
   const mockData = useMockData();
 
   const listClientes = mockData?.listClientes ?? (() => []);
+  const atualizarCliente = mockData?.atualizarCliente;
   const isLoading = mockData?.isLoading ?? false;
   const clientes = listClientes();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('todos');
   const [selectedClient, setSelectedClient] = useState<UserType | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm>({
+    fullName: '',
+    email: '',
+    phone: '',
+    cpf: '',
+    cnpj: '',
+    companyName: '',
+  });
 
   const isAdmin = user?.roles?.includes('Admin');
 
@@ -104,7 +127,80 @@ export default function ClientsScreen() {
 
   const handleSelectClient = useCallback((client: UserType) => {
     setSelectedClient(client);
+    setIsEditing(false);
   }, []);
+
+  const handleStartEdit = useCallback(() => {
+    if (!selectedClient) return;
+    setEditForm({
+      fullName: selectedClient.fullName ?? '',
+      email: selectedClient.email ?? '',
+      phone: selectedClient.phone ?? '',
+      cpf: selectedClient.cpf ?? '',
+      cnpj: selectedClient.cnpj ?? '',
+      companyName: selectedClient.companyName ?? '',
+    });
+    setIsEditing(true);
+  }, [selectedClient]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!selectedClient || !atualizarCliente) return;
+
+    if (!editForm.fullName.trim()) {
+      Alert.alert('Campo obrigatório', 'O nome completo é obrigatório.');
+      return;
+    }
+    if (!editForm.email.trim()) {
+      Alert.alert('Campo obrigatório', 'O e-mail é obrigatório.');
+      return;
+    }
+
+    setIsSaving(true);
+    console.log('ClientsScreen: Salvando edição do cliente:', selectedClient.id);
+
+    try {
+      const updated = await atualizarCliente(selectedClient.id, {
+        fullName: editForm.fullName.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim() || undefined,
+        cpf: editForm.cpf.trim() || undefined,
+        cnpj: editForm.cnpj.trim() || undefined,
+        companyName: editForm.companyName.trim() || undefined,
+      });
+
+      if (updated) {
+        setSelectedClient(updated);
+        setIsEditing(false);
+        console.log('ClientsScreen: Cliente atualizado com sucesso');
+      } else {
+        Alert.alert('Erro', 'Não foi possível salvar as alterações. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('ClientsScreen: Erro ao salvar cliente:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao salvar. Tente novamente.');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [selectedClient, editForm, atualizarCliente]);
+
+  const handleCloseModal = useCallback(() => {
+    if (isEditing) {
+      Alert.alert(
+        'Descartar alterações?',
+        'Você tem alterações não salvas. Deseja descartá-las?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Descartar', style: 'destructive', onPress: () => { setIsEditing(false); setSelectedClient(null); } },
+        ]
+      );
+    } else {
+      setSelectedClient(null);
+    }
+  }, [isEditing]);
 
   const renderClientCard = useCallback(({ item }: { item: UserType }) => {
     const isPJ = !!item.cnpj || !!item.companyName;
@@ -237,96 +333,225 @@ export default function ClientsScreen() {
         visible={selectedClient !== null}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setSelectedClient(null)}
+        onRequestClose={handleCloseModal}
       >
         {selectedClient && (
-          <View style={styles.modalContainer}>
+          <KeyboardAvoidingView
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Dados do Cliente</Text>
               <TouchableOpacity
-                onPress={() => setSelectedClient(null)}
+                onPress={handleCloseModal}
                 activeOpacity={0.7}
                 style={styles.closeBtn}
               >
                 <X size={22} color={Colors.text} />
               </TouchableOpacity>
+              <Text style={styles.modalTitle}>
+                {isEditing ? 'Editar Cliente' : 'Dados do Cliente'}
+              </Text>
+              {isEditing ? (
+                <TouchableOpacity
+                  onPress={handleSave}
+                  activeOpacity={0.7}
+                  style={styles.saveBtn}
+                  disabled={isSaving}
+                  testID="save-client-btn"
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : (
+                    <Check size={22} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleStartEdit}
+                  activeOpacity={0.7}
+                  style={styles.editBtn}
+                  testID="edit-client-btn"
+                >
+                  <Pencil size={20} color={Colors.primary} />
+                </TouchableOpacity>
+              )}
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              <View style={styles.profileSection}>
-                {selectedClient.profileImageUrl ? (
-                  <Image source={{ uri: selectedClient.profileImageUrl }} style={styles.profileAvatar} />
-                ) : (
-                  <View style={[
-                    styles.profileAvatarPlaceholder,
-                    (!!selectedClient.cnpj || !!selectedClient.companyName) && styles.avatarPJ,
-                  ]}>
-                    <Text style={styles.profileInitials}>{getInitials(selectedClient.fullName)}</Text>
+            <ScrollView
+              contentContainerStyle={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+            >
+              {isEditing ? (
+                <View style={styles.editForm}>
+                  <View style={styles.editBanner}>
+                    <AlertCircle size={15} color={Colors.primary} />
+                    <Text style={styles.editBannerText}>
+                      Edite os campos e toque em ✓ para salvar
+                    </Text>
                   </View>
-                )}
-                <Text style={styles.profileName}>{selectedClient.fullName}</Text>
-                {selectedClient.companyName ? (
-                  <Text style={styles.profileCompany}>{selectedClient.companyName}</Text>
-                ) : null}
-                <View style={styles.typeBadge}>
-                  <Text style={styles.typeBadgeText}>
-                    {selectedClient.cnpj || selectedClient.companyName ? 'Pessoa Jurídica' : 'Pessoa Física'}
-                  </Text>
+
+                  <EditField
+                    label="Nome Completo *"
+                    value={editForm.fullName}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, fullName: v }))}
+                    placeholder="Nome completo do cliente"
+                    autoCapitalize="words"
+                  />
+                  <EditField
+                    label="E-mail *"
+                    value={editForm.email}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, email: v }))}
+                    placeholder="email@exemplo.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  <EditField
+                    label="Telefone"
+                    value={editForm.phone}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, phone: v }))}
+                    placeholder="(00) 00000-0000"
+                    keyboardType="phone-pad"
+                  />
+                  <EditField
+                    label="CPF"
+                    value={editForm.cpf}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, cpf: v }))}
+                    placeholder="000.000.000-00"
+                    keyboardType="numeric"
+                  />
+                  <EditField
+                    label="CNPJ"
+                    value={editForm.cnpj}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, cnpj: v }))}
+                    placeholder="00.000.000/0000-00"
+                    keyboardType="numeric"
+                  />
+                  <EditField
+                    label="Razão Social"
+                    value={editForm.companyName}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, companyName: v }))}
+                    placeholder="Nome da empresa"
+                    autoCapitalize="words"
+                  />
+
+                  <TouchableOpacity
+                    style={styles.cancelEditBtn}
+                    onPress={handleCancelEdit}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cancelEditText}>Cancelar edição</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
+              ) : (
+                <>
+                  <View style={styles.profileSection}>
+                    {selectedClient.profileImageUrl ? (
+                      <Image source={{ uri: selectedClient.profileImageUrl }} style={styles.profileAvatar} />
+                    ) : (
+                      <View style={[
+                        styles.profileAvatarPlaceholder,
+                        (!!selectedClient.cnpj || !!selectedClient.companyName) && styles.avatarPJ,
+                      ]}>
+                        <Text style={styles.profileInitials}>{getInitials(selectedClient.fullName)}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.profileName}>{selectedClient.fullName}</Text>
+                    {selectedClient.companyName ? (
+                      <Text style={styles.profileCompany}>{selectedClient.companyName}</Text>
+                    ) : null}
+                    <View style={styles.typeBadge}>
+                      <Text style={styles.typeBadgeText}>
+                        {selectedClient.cnpj || selectedClient.companyName ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                      </Text>
+                    </View>
+                  </View>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Identificação</Text>
-                {selectedClient.cpf ? (
-                  <DetailRow icon={<FileText size={16} color={Colors.primary} />} label="CPF" value={formatCPF(selectedClient.cpf)} />
-                ) : null}
-                {selectedClient.cnpj ? (
-                  <DetailRow icon={<Building2 size={16} color={Colors.primary} />} label="CNPJ" value={formatCNPJ(selectedClient.cnpj)} />
-                ) : null}
-                {!selectedClient.cpf && !selectedClient.cnpj && (
-                  <Text style={styles.noData}>Não informado</Text>
-                )}
-              </View>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Identificação</Text>
+                    {selectedClient.cpf ? (
+                      <DetailRow icon={<FileText size={16} color={Colors.primary} />} label="CPF" value={formatCPF(selectedClient.cpf)} />
+                    ) : null}
+                    {selectedClient.cnpj ? (
+                      <DetailRow icon={<Building2 size={16} color={Colors.primary} />} label="CNPJ" value={formatCNPJ(selectedClient.cnpj)} />
+                    ) : null}
+                    {!selectedClient.cpf && !selectedClient.cnpj && (
+                      <Text style={styles.noData}>Não informado</Text>
+                    )}
+                  </View>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Contato</Text>
-                <DetailRow icon={<Mail size={16} color={Colors.primary} />} label="E-mail" value={selectedClient.email} />
-                {selectedClient.phone ? (
-                  <DetailRow icon={<Phone size={16} color={Colors.primary} />} label="Telefone" value={formatPhone(selectedClient.phone)} />
-                ) : (
-                  <DetailRow icon={<Phone size={16} color={Colors.textLight} />} label="Telefone" value="Não informado" muted />
-                )}
-              </View>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Contato</Text>
+                    <DetailRow icon={<Mail size={16} color={Colors.primary} />} label="E-mail" value={selectedClient.email} />
+                    {selectedClient.phone ? (
+                      <DetailRow icon={<Phone size={16} color={Colors.primary} />} label="Telefone" value={formatPhone(selectedClient.phone)} />
+                    ) : (
+                      <DetailRow icon={<Phone size={16} color={Colors.textLight} />} label="Telefone" value="Não informado" muted />
+                    )}
+                  </View>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Cadastro</Text>
-                <DetailRow
-                  icon={<Calendar size={16} color={Colors.primary} />}
-                  label="Cliente desde"
-                  value={formatDate(selectedClient.createdAt)}
-                />
-                <DetailRow
-                  icon={<Calendar size={16} color={Colors.primary} />}
-                  label="Última atualização"
-                  value={formatDate(selectedClient.updatedAt)}
-                />
-              </View>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Cadastro</Text>
+                    <DetailRow
+                      icon={<Calendar size={16} color={Colors.primary} />}
+                      label="Cliente desde"
+                      value={formatDate(selectedClient.createdAt)}
+                    />
+                    <DetailRow
+                      icon={<Calendar size={16} color={Colors.primary} />}
+                      label="Última atualização"
+                      value={formatDate(selectedClient.updatedAt)}
+                    />
+                  </View>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>LGPD</Text>
-                <View style={styles.lgpdRow}>
-                  <View style={[styles.lgpdDot, selectedClient.lgpdConsent ? styles.lgpdDotOk : styles.lgpdDotNo]} />
-                  <Text style={styles.lgpdText}>
-                    {selectedClient.lgpdConsent
-                      ? `Consentimento registrado em ${formatDate(selectedClient.lgpdConsentDate)}`
-                      : 'Consentimento não registrado'}
-                  </Text>
-                </View>
-              </View>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>LGPD</Text>
+                    <View style={styles.lgpdRow}>
+                      <View style={[styles.lgpdDot, selectedClient.lgpdConsent ? styles.lgpdDotOk : styles.lgpdDotNo]} />
+                      <Text style={styles.lgpdText}>
+                        {selectedClient.lgpdConsent
+                          ? `Consentimento registrado em ${formatDate(selectedClient.lgpdConsentDate)}`
+                          : 'Consentimento não registrado'}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
             </ScrollView>
-          </View>
+          </KeyboardAvoidingView>
         )}
       </Modal>
+    </View>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  autoCapitalize,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric';
+  autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
+}) {
+  return (
+    <View style={styles.editFieldGroup}>
+      <Text style={styles.editFieldLabel}>{label}</Text>
+      <TextInput
+        style={styles.editFieldInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={Colors.textLight}
+        keyboardType={keyboardType ?? 'default'}
+        autoCapitalize={autoCapitalize ?? 'sentences'}
+        autoCorrect={false}
+      />
     </View>
   );
 }
@@ -544,12 +769,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.headerBackground,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700' as const,
     color: Colors.text,
+    flex: 1,
+    textAlign: 'center' as const,
   },
   closeBtn: {
     padding: 4,
+    width: 36,
+  },
+  editBtn: {
+    padding: 4,
+    width: 36,
+    alignItems: 'flex-end' as const,
+  },
+  saveBtn: {
+    padding: 4,
+    width: 36,
+    alignItems: 'flex-end' as const,
   },
   modalBody: {
     padding: 20,
@@ -675,5 +913,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     flex: 1,
+  },
+  editForm: {
+    gap: 4,
+  },
+  editBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    backgroundColor: Colors.primary + '12',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  editBannerText: {
+    fontSize: 13,
+    color: Colors.primary,
+    flex: 1,
+  },
+  editFieldGroup: {
+    marginBottom: 14,
+  },
+  editFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  editFieldInput: {
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  cancelEditBtn: {
+    marginTop: 8,
+    alignItems: 'center' as const,
+    paddingVertical: 14,
+  },
+  cancelEditText: {
+    fontSize: 15,
+    color: Colors.error,
+    fontWeight: '500' as const,
   },
 });

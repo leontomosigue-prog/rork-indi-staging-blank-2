@@ -618,6 +618,35 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     return clientes;
   }, [clientes]);
 
+  const atualizarCliente = useCallback(async (id: string, data: Partial<User>): Promise<User | null> => {
+    console.log('MockDataContext: Atualizando cliente:', { id, data });
+    try {
+      const usersDbString = await AsyncStorage.getItem('@indi:usersDb');
+      const allUsers: User[] = usersDbString ? JSON.parse(usersDbString) : [];
+      const userIndex = allUsers.findIndex(u => u.id === id);
+
+      if (userIndex === -1) return null;
+
+      allUsers[userIndex] = {
+        ...allUsers[userIndex],
+        ...data,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem('@indi:usersDb', JSON.stringify(allUsers));
+
+      const updatedClientes = clientes.map(c =>
+        c.id === id ? allUsers[userIndex] : c
+      );
+      setClientes(updatedClientes);
+      console.log('MockDataContext: Cliente atualizado com sucesso');
+      return allUsers[userIndex];
+    } catch (error) {
+      console.error('MockDataContext: Erro ao atualizar cliente:', error);
+      return null;
+    }
+  }, [clientes]);
+
   return useMemo(() => ({
     conversas,
     mensagens,
@@ -646,6 +675,7 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     atualizarColaborador,
     removerColaborador,
     listClientes,
+    atualizarCliente,
   }), [
     conversas,
     mensagens,
@@ -674,5 +704,6 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
     atualizarColaborador,
     removerColaborador,
     listClientes,
+    atualizarCliente,
   ]);
 });
