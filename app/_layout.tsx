@@ -55,6 +55,7 @@ function RootLayoutNav() {
             <Stack.Screen name="chat/[id]" options={{ title: "Conversa" }} />
             <Stack.Screen name="debug-auth" options={{ title: "Debug Auth" }} />
             <Stack.Screen name="forgot-password" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="admin-requests" options={{ title: 'Solicitações de Senha', headerShown: true }} />
         </Stack>
     );
 }

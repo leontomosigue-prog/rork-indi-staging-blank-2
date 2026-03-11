@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowLeft, Mail, Phone, CreditCard, CheckCircle, Send } from 'lucide-react-native';
+import { ArrowLeft, Mail, Phone, CreditCard, CheckCircle, Send, Clock, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { trpc } from '@/lib/trpc';
 
 type Method = 'choose' | 'email' | 'phone' | 'cpf' | 'success';
 
@@ -30,62 +31,49 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
-const maskEmail = (email: string) => {
-  const [user, domain] = email.split('@');
-  if (!user || !domain) return email;
-  const visible = user.slice(0, 2);
-  const masked = '*'.repeat(Math.max(user.length - 2, 3));
-  return `${visible}${masked}@${domain}`;
-};
-
 export default function ForgotPasswordScreen() {
   const [step, setStep] = useState<Method>('choose');
   const [emailValue, setEmailValue] = useState('');
   const [phoneValue, setPhoneValue] = useState('');
   const [cpfValue, setCpfValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
-  const handleEmailSubmit = async () => {
+  const createRequest = trpc.passwordReset.create.useMutation({
+    onSuccess: () => {
+      setStep('success');
+    },
+    onError: (err) => {
+      setError(err.message || 'Erro ao enviar solicitação. Tente novamente.');
+    },
+  });
+
+  const handleEmailSubmit = () => {
     if (!emailValue.trim() || !emailValue.includes('@')) {
       setError('Por favor, insira um e-mail válido.');
       return;
     }
     setError('');
-    setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setIsLoading(false);
-    setSuccessMessage(`Um link de recuperação foi enviado para ${maskEmail(emailValue)}.`);
-    setStep('success');
+    createRequest.mutate({ method: 'email', value: emailValue.trim().toLowerCase() });
   };
 
-  const handlePhoneSubmit = async () => {
+  const handlePhoneSubmit = () => {
     const digits = phoneValue.replace(/\D/g, '');
     if (digits.length < 10) {
       setError('Por favor, insira um telefone válido.');
       return;
     }
     setError('');
-    setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setIsLoading(false);
-    setSuccessMessage(`Um SMS com o código de recuperação foi enviado para ${phoneValue}.`);
-    setStep('success');
+    createRequest.mutate({ method: 'phone', value: phoneValue });
   };
 
-  const handleCpfSubmit = async () => {
+  const handleCpfSubmit = () => {
     const digits = cpfValue.replace(/\D/g, '');
     if (digits.length < 11) {
       setError('Por favor, insira um CPF válido.');
       return;
     }
     setError('');
-    setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setIsLoading(false);
-    setSuccessMessage(`Encontramos sua conta. Um e-mail de recuperação foi enviado para o endereço cadastrado.`);
-    setStep('success');
+    createRequest.mutate({ method: 'cpf', value: cpfValue });
   };
 
   const goBack = () => {
@@ -97,15 +85,19 @@ export default function ForgotPasswordScreen() {
     }
   };
 
+  const isLoading = createRequest.isPending;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Pressable style={styles.backButton} onPress={goBack}>
-          <ArrowLeft size={22} color="#FFFFFF" />
-        </Pressable>
+        {step !== 'success' && (
+          <Pressable style={styles.backButton} onPress={goBack}>
+            <ArrowLeft size={22} color="#FFFFFF" />
+          </Pressable>
+        )}
 
         {step === 'choose' && (
           <View style={styles.section}>
@@ -114,17 +106,22 @@ export default function ForgotPasswordScreen() {
               Como você prefere recuperar o acesso à sua conta?
             </Text>
 
+            <View style={styles.adminInfoCard}>
+              <ShieldCheck size={18} color="#FF9500" style={{ marginRight: 10 }} />
+              <Text style={styles.adminInfoText}>
+                Sua solicitação será analisada e aprovada manualmente por um administrador.
+              </Text>
+            </View>
+
             <Pressable style={styles.methodCard} onPress={() => { setError(''); setStep('email'); }}>
               <View style={styles.methodIconWrap}>
                 <Mail size={24} color="#FF0000" />
               </View>
               <View style={styles.methodInfo}>
                 <Text style={styles.methodTitle}>Por e-mail</Text>
-                <Text style={styles.methodDesc}>Receba um link de recuperação no seu e-mail cadastrado</Text>
+                <Text style={styles.methodDesc}>Informe o e-mail cadastrado na sua conta</Text>
               </View>
-              <View style={styles.methodArrow}>
-                <Text style={styles.methodArrowText}>›</Text>
-              </View>
+              <Text style={styles.methodArrowText}>›</Text>
             </Pressable>
 
             <Pressable style={styles.methodCard} onPress={() => { setError(''); setStep('phone'); }}>
@@ -133,11 +130,9 @@ export default function ForgotPasswordScreen() {
               </View>
               <View style={styles.methodInfo}>
                 <Text style={styles.methodTitle}>Por telefone</Text>
-                <Text style={styles.methodDesc}>Receba um SMS com o código de recuperação</Text>
+                <Text style={styles.methodDesc}>Informe o telefone cadastrado na sua conta</Text>
               </View>
-              <View style={styles.methodArrow}>
-                <Text style={styles.methodArrowText}>›</Text>
-              </View>
+              <Text style={styles.methodArrowText}>›</Text>
             </Pressable>
 
             <Pressable style={styles.methodCard} onPress={() => { setError(''); setStep('cpf'); }}>
@@ -148,9 +143,7 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.methodTitle}>Por CPF</Text>
                 <Text style={styles.methodDesc}>Informe seu CPF para identificarmos sua conta</Text>
               </View>
-              <View style={styles.methodArrow}>
-                <Text style={styles.methodArrowText}>›</Text>
-              </View>
+              <Text style={styles.methodArrowText}>›</Text>
             </Pressable>
           </View>
         )}
@@ -164,7 +157,7 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={styles.title}>Recuperar por e-mail</Text>
             <Text style={styles.subtitle}>
-              Insira o e-mail cadastrado na sua conta. Enviaremos um link para redefinir sua senha.
+              Informe o e-mail cadastrado. Sua solicitação será processada pelo administrador.
             </Text>
             <View style={styles.inputContainer}>
               <Mail size={18} color="rgba(255,255,255,0.5)" style={styles.inputIcon} />
@@ -191,7 +184,7 @@ export default function ForgotPasswordScreen() {
               ) : (
                 <>
                   <Send size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitButtonText}>Enviar link</Text>
+                  <Text style={styles.submitButtonText}>Enviar solicitação</Text>
                 </>
               )}
             </Pressable>
@@ -207,7 +200,7 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={styles.title}>Recuperar por telefone</Text>
             <Text style={styles.subtitle}>
-              Insira o telefone cadastrado na sua conta. Enviaremos um SMS com o código de recuperação.
+              Informe o telefone cadastrado. Sua solicitação será processada pelo administrador.
             </Text>
             <View style={styles.inputContainer}>
               <Phone size={18} color="rgba(255,255,255,0.5)" style={styles.inputIcon} />
@@ -232,7 +225,7 @@ export default function ForgotPasswordScreen() {
               ) : (
                 <>
                   <Send size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitButtonText}>Enviar SMS</Text>
+                  <Text style={styles.submitButtonText}>Enviar solicitação</Text>
                 </>
               )}
             </Pressable>
@@ -248,7 +241,7 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={styles.title}>Recuperar por CPF</Text>
             <Text style={styles.subtitle}>
-              Insira seu CPF. Localizaremos sua conta e enviaremos o link de recuperação para o e-mail cadastrado.
+              Informe seu CPF. Sua solicitação será processada pelo administrador.
             </Text>
             <View style={styles.inputContainer}>
               <CreditCard size={18} color="rgba(255,255,255,0.5)" style={styles.inputIcon} />
@@ -283,14 +276,28 @@ export default function ForgotPasswordScreen() {
         {step === 'success' && (
           <View style={styles.successSection}>
             <View style={styles.successIconCircle}>
-              <CheckCircle size={56} color="#FF0000" />
+              <Clock size={56} color="#FF9500" />
             </View>
-            <Text style={styles.successTitle}>Pronto!</Text>
-            <Text style={styles.successMessage}>{successMessage}</Text>
-            <Text style={styles.successHint}>
-              Verifique também sua caixa de spam caso não encontre o e-mail.
+            <Text style={styles.successTitle}>Solicitação enviada!</Text>
+            <Text style={styles.successMessage}>
+              Sua solicitação de recuperação de senha foi registrada com sucesso.
             </Text>
+            <View style={styles.successStepsCard}>
+              <View style={styles.successStep}>
+                <View style={styles.stepDot} />
+                <Text style={styles.stepText}>Um administrador irá verificar sua identidade</Text>
+              </View>
+              <View style={styles.successStep}>
+                <View style={styles.stepDot} />
+                <Text style={styles.stepText}>Você receberá uma senha temporária</Text>
+              </View>
+              <View style={styles.successStep}>
+                <View style={styles.stepDot} />
+                <Text style={styles.stepText}>Acesse com a senha temporária e troque imediatamente</Text>
+              </View>
+            </View>
             <Pressable style={styles.submitButton} onPress={() => router.back()}>
+              <CheckCircle size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.submitButtonText}>Voltar ao login</Text>
             </Pressable>
           </View>
@@ -348,7 +355,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: 'rgba(255,255,255,0.55)',
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: 24,
+  },
+  adminInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,149,0,0.08)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,149,0,0.25)',
+  },
+  adminInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    lineHeight: 19,
   },
   methodCard: {
     flexDirection: 'row',
@@ -383,13 +406,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 18,
   },
-  methodArrow: {
-    paddingLeft: 8,
-  },
   methodArrowText: {
     fontSize: 24,
     color: 'rgba(255,255,255,0.3)',
     lineHeight: 28,
+    paddingLeft: 8,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -440,35 +461,56 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   successIconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,0,0,0.1)',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255,149,0,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 28,
     borderWidth: 1,
-    borderColor: 'rgba(255,0,0,0.2)',
+    borderColor: 'rgba(255,149,0,0.25)',
   },
   successTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700' as const,
     color: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   successMessage: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.65)',
     textAlign: 'center' as const,
-    lineHeight: 24,
-    marginBottom: 12,
+    lineHeight: 22,
+    marginBottom: 28,
     paddingHorizontal: 16,
   },
-  successHint: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center' as const,
-    marginBottom: 40,
-    paddingHorizontal: 24,
+  successStepsCard: {
+    width: '100%',
+    backgroundColor: '#1E1E1E',
+    borderRadius: 14,
+    padding: 20,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: '#3A3A3A',
+    gap: 14,
+  },
+  successStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF9500',
+    marginTop: 5,
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 20,
   },
 });

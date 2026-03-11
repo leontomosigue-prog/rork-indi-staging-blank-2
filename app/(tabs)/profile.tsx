@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Image, Alert, Platform, Modal, TextInput } from 'react-native';
 import { router } from 'expo-router';
-import { User, Settings, Building2, Shield, TrendingUp, MessageSquare, CheckCircle2, Camera, X, Edit2 } from 'lucide-react-native';
+import { User, Settings, Building2, Shield, TrendingUp, MessageSquare, CheckCircle2, Camera, X, Edit2, ShieldCheck } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -273,6 +273,29 @@ export default function ProfileScreen() {
                 </View>
               ))}
             </View>
+          </View>
+        </View>
+      )}
+
+      {isAdmin && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ShieldCheck size={20} color={Colors.primary} />
+            <Text style={styles.sectionTitle}>Administração</Text>
+          </View>
+          <View style={styles.infoCard}>
+            <Pressable style={styles.settingRow} onPress={() => router.push('/admin-requests' as any)}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={styles.adminMenuIcon}>
+                  <ShieldCheck size={16} color="#FF9500" />
+                </View>
+                <View>
+                  <Text style={styles.settingLabel}>Solicitações de Recuperação de Senha</Text>
+                  <Text style={styles.adminMenuSubtitle}>Verifique e aprove pedidos de clientes</Text>
+                </View>
+              </View>
+              <Text style={styles.settingAction}>›</Text>
+            </Pressable>
           </View>
         </View>
       )}
@@ -875,5 +898,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600' as const,
     color: '#FFFFFF',
+  },
+  adminMenuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,149,0,0.12)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  adminMenuSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });

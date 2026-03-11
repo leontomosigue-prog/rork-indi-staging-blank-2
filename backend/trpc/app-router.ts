@@ -39,6 +39,11 @@ import archiveForUser from "./routes/conversations/archiveForUser";
 import listByConversation from "./routes/messages/listByConversation";
 import sendMessage from "./routes/messages/send";
 
+import createPasswordReset from "./routes/password_reset/create";
+import listPasswordResets from "./routes/password_reset/list";
+import approvePasswordReset from "./routes/password_reset/approve";
+import rejectPasswordReset from "./routes/password_reset/reject";
+
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
     hi: hiRoute,
@@ -87,6 +92,12 @@ export const appRouter = createTRPCRouter({
   messages: createTRPCRouter({
     listByConversation,
     send: sendMessage,
+  }),
+  passwordReset: createTRPCRouter({
+    create: createPasswordReset,
+    list: listPasswordResets,
+    approve: approvePasswordReset,
+    reject: rejectPasswordReset,
   }),
 });
 

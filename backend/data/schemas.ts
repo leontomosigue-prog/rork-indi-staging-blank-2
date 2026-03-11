@@ -89,6 +89,20 @@ export const MessageSchema = z.object({
   createdAt: z.coerce.date(),
 });
 
+export const PasswordResetRequestSchema = z.object({
+  id: z.string(),
+  method: z.enum(["email", "phone", "cpf"]),
+  value: z.string(),
+  status: z.enum(["pending", "approved", "rejected"]),
+  userId: z.string().optional(),
+  userName: z.string().optional(),
+  userEmail: z.string().optional(),
+  adminNote: z.string().optional(),
+  tempPassword: z.string().optional(),
+  createdAt: z.coerce.date(),
+  resolvedAt: z.coerce.date().optional(),
+});
+
 export type User = z.infer<typeof UserSchema>;
 export type Machine = z.infer<typeof MachineSchema>;
 export type RentalOffer = z.infer<typeof RentalOfferSchema>;
@@ -96,3 +110,4 @@ export type Parts = z.infer<typeof PartsSchema>;
 export type Ticket = z.infer<typeof TicketSchema>;
 export type Conversation = z.infer<typeof ConversationSchema>;
 export type Message = z.infer<typeof MessageSchema>;
+export type PasswordResetRequest = z.infer<typeof PasswordResetRequestSchema>;
