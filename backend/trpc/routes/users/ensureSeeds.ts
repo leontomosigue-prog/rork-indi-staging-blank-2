@@ -43,6 +43,17 @@ export default publicProcedure.mutation(async () => {
       password: "cliente123",
       roles: [] as const,
     },
+    {
+      email: "pedro.teste@email.com",
+      name: "Pedro Almeida",
+      password: "teste123",
+      phone: "(11) 98765-4321",
+      cpf: "123.456.789-09",
+      birthDate: "15/04/1985",
+      companyName: "Almeida Construções Ltda",
+      cnpj: "12.345.678/0001-95",
+      roles: [] as const,
+    },
   ];
 
   const allExist = testUsers.every(testUser => 
@@ -59,15 +70,21 @@ export default publicProcedure.mutation(async () => {
   for (const testUser of testUsers) {
     const exists = users.some(u => u.email === testUser.email);
     if (!exists) {
+      const u = testUser as any;
       users.push({
         id: nanoid(),
         name: testUser.name,
         email: testUser.email,
         passwordHash: testUser.password,
+        ...(u.phone ? { phone: u.phone } : {}),
+        ...(u.cpf ? { cpf: u.cpf } : {}),
+        ...(u.birthDate ? { birthDate: u.birthDate } : {}),
+        ...(u.companyName ? { companyName: u.companyName } : {}),
+        ...(u.cnpj ? { cnpj: u.cnpj } : {}),
         roles: [...testUser.roles],
         createdAt: now,
         updatedAt: now,
-      });
+      } as any);
       createdCount++;
     }
   }

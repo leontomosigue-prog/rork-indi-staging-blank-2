@@ -52,5 +52,19 @@
     "roles": [],
     "createdAt": "2025-01-17T00:00:00.000Z",
     "updatedAt": "2025-01-17T00:00:00.000Z"
+  },
+  {
+    "id": "client_user_002",
+    "name": "Pedro Almeida",
+    "email": "pedro.teste@email.com",
+    "passwordHash": "teste123",
+    "phone": "(11) 98765-4321",
+    "cpf": "123.456.789-09",
+    "birthDate": "15/04/1985",
+    "companyName": "Almeida Construções Ltda",
+    "cnpj": "12.345.678/0001-95",
+    "roles": [],
+    "createdAt": "2025-01-17T00:00:00.000Z",
+    "updatedAt": "2025-01-17T00:00:00.000Z"
   }
 ]
