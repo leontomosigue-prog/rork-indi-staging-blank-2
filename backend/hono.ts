@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { trpcServer } from '@hono/trpc-server';
+import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter } from './trpc/app-router';
 import { createContext } from './trpc/create-context';
 import { read, write } from './data/store';
@@ -270,6 +270,8 @@ app.all('/__echo_trpc_path/*', (c) => {
 });
 
 app.use('/trpc/*', async (c, next) => {
+  c.header('x-indi-backend-id', BACKEND_ID);
+  c.header('x-indi-build', String(BUILD_TIMESTAMP));
   const url = new URL(c.req.url);
   console.log('[TRPC_FORENSIC]', {
     method: c.req.method,
@@ -322,14 +324,14 @@ app.use('/trpc/*', async (c, next) => {
   }
 });
 
-app.all(
-  '/trpc/*',
-  trpcServer({
+app.all('/trpc/*', (c) => {
+  return fetchRequestHandler({
     endpoint: '/trpc',
+    req: c.req.raw,
     router: appRouter,
     createContext,
-  })
-);
+  });
+});
 
 app.notFound((c) => {
   return c.json({
