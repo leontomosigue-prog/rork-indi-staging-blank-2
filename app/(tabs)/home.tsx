@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MessageSquare } from 'lucide-react-native';
+import { MessageSquare, ClipboardList, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -14,7 +14,9 @@ export default function HomeScreen() {
   const listConversasPorUsuario = mockData?.listConversasPorUsuario ?? (() => []);
   const isLoading = mockData?.isLoading ?? false;
 
-  const conversas = user ? listConversasPorUsuario(user) : [];
+  const isClient = user?.type === 'client';
+
+  const conversas = isClient && user ? listConversasPorUsuario(user) : [];
   const conversasAbertas = conversas.filter((c: any) => c.status === 'aberta');
 
   const formatDate = (date: string) => {
@@ -71,16 +73,41 @@ export default function HomeScreen() {
     );
   }
 
+  if (!isClient) {
+    return (
+      <View style={styles.container}>
+        <Logo size={80} />
+        <View style={styles.header}>
+          <Text style={styles.title}>Olá, {user.fullName}!</Text>
+          <Text style={styles.subtitle}>Bem-vindo ao painel do colaborador</Text>
+        </View>
+
+        <View style={styles.dashboardContent}>
+          <TouchableOpacity
+            style={styles.shortcutCard}
+            onPress={() => router.push('/(tabs)/tickets' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.shortcutIcon}>
+              <ClipboardList size={28} color={Colors.primary} />
+            </View>
+            <View style={styles.shortcutInfo}>
+              <Text style={styles.shortcutTitle}>Chamados</Text>
+              <Text style={styles.shortcutSubtitle}>Ver pedidos e atendimentos pendentes</Text>
+            </View>
+            <ChevronRight size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Logo size={80} />
       <View style={styles.header}>
         <Text style={styles.title}>Olá, {user.fullName}!</Text>
-        <Text style={styles.subtitle}>
-          {user.type === 'client'
-            ? 'Seus atendimentos em aberto'
-            : 'Atendimentos pendentes'}
-        </Text>
+        <Text style={styles.subtitle}>Seus atendimentos em aberto</Text>
       </View>
 
       <FlatList
@@ -91,15 +118,9 @@ export default function HomeScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MessageSquare size={64} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>
-              {user.type === 'client'
-                ? 'Você não tem atendimentos em aberto'
-                : 'Nenhum atendimento pendente'}
-            </Text>
+            <Text style={styles.emptyText}>Você não tem atendimentos em aberto</Text>
             <Text style={styles.emptySubtext}>
-              {user.type === 'client'
-                ? 'Solicite um orçamento ou serviço através das outras abas'
-                : 'Todos os atendimentos foram resolvidos'}
+              Solicite um orçamento ou serviço através das outras abas
             </Text>
           </View>
         }
@@ -214,5 +235,45 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center' as const,
     lineHeight: 20,
+  },
+  dashboardContent: {
+    padding: 20,
+  },
+  shortcutCard: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 14,
+    padding: 18,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  shortcutIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: `${Colors.primary}15`,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  shortcutInfo: {
+    flex: 1,
+  },
+  shortcutTitle: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    marginBottom: 3,
+  },
+  shortcutSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
 });

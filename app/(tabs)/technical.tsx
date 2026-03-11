@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -11,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Wrench } from 'lucide-react-native';
+import { Wrench, ClipboardList, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import Colors from '@/constants/Colors';
@@ -30,7 +29,6 @@ export default function TechnicalScreen() {
   const router = useRouter();
   const {
     criarConversa = async () => '',
-    listConversasPorArea = () => [],
     isLoading = false,
   } = useMockData() ?? {};
   const [priority, setPriority] = useState<Priority>('Preventiva');
@@ -43,10 +41,6 @@ export default function TechnicalScreen() {
   const hasAdminOrTechnicalRole = user?.roles?.some(
     (role) => role === 'Admin' || role === 'Assistência Técnica'
   );
-
-  const conversasTecnicas = user && hasAdminOrTechnicalRole 
-    ? listConversasPorArea('Assistência Técnica', user) 
-    : [];
 
   const handleSubmitTicket = async () => {
     if (!description.trim()) {
@@ -83,77 +77,44 @@ export default function TechnicalScreen() {
     }
   };
 
-  const renderConversa = ({ item }: any) => (
-    <TouchableOpacity
-      style={[
-        styles.conversaCard,
-        item.status === 'resolvida' && styles.conversaCardResolvida,
-      ]}
-      onPress={() => router.push(`/chat/${item.id}` as any)}
-    >
-      <View style={styles.conversaHeader}>
-        <Text style={styles.conversaTitle}>{item.titulo}</Text>
-        {item.prioridade && (
-          <View
-            style={[
-              styles.priorityBadge,
-              {
-                backgroundColor:
-                  PRIORITIES.find((p) => p.value === item.prioridade)?.color + '20',
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.priorityText,
-                { color: PRIORITIES.find((p) => p.value === item.prioridade)?.color },
-              ]}
-            >
-              {item.prioridade}
-            </Text>
-          </View>
-        )}
+  if (isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
-      <Text style={styles.conversaClient}>{item.clienteNome}</Text>
-      <View style={styles.conversaFooter}>
-        <Text style={styles.conversaDate}>
-          {new Date(item.updatedAt).toLocaleDateString('pt-BR')}
-        </Text>
-        {item.status === 'resolvida' && (
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>Resolvida</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  }
 
   if (hasAdminOrTechnicalRole) {
-    if (isLoading) {
-      return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      );
-    }
-
     return (
       <View style={styles.container}>
         <Logo size={80} />
         <Stack.Screen options={{ title: 'Assistência Técnica' }} />
 
-        <FlatList
-          data={conversasTecnicas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderConversa}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Wrench size={64} color={Colors.textLight} />
-              <Text style={styles.emptyText}>Nenhum chamado na fila</Text>
+        <View style={styles.employeeContent}>
+          <View style={styles.employeeHeader}>
+            <Wrench size={36} color={Colors.primary} />
+            <Text style={styles.employeeTitle}>Assistência Técnica</Text>
+            <Text style={styles.employeeSubtitle}>
+              Os chamados de assistência técnica dos clientes estão disponíveis na aba de Chamados
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.shortcutCard}
+            onPress={() => router.push('/(tabs)/tickets' as any)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.shortcutIcon}>
+              <ClipboardList size={26} color={Colors.primary} />
             </View>
-          }
-        />
+            <View style={styles.shortcutInfo}>
+              <Text style={styles.shortcutTitle}>Ver Chamados</Text>
+              <Text style={styles.shortcutSubtitle}>Acessar fila de atendimentos de Assistência Técnica</Text>
+            </View>
+            <ChevronRight size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -257,80 +218,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   },
-  listContainer: {
-    padding: 16,
+  employeeContent: {
+    flex: 1,
+    padding: 20,
   },
-  conversaCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+  employeeHeader: {
+    alignItems: 'center' as const,
+    paddingVertical: 32,
+    gap: 10,
+  },
+  employeeTitle: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    marginTop: 4,
+  },
+  employeeSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center' as const,
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
+  shortcutCard: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 14,
+    padding: 18,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     elevation: 3,
   },
-  conversaCardResolvida: {
-    backgroundColor: '#f9fafb',
-    opacity: 0.85,
-  },
-  conversaHeader: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: 8,
-  },
-  conversaTitle: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.text,
-    flex: 1,
-  },
-  priorityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  priorityText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-  },
-  conversaClient: {
-    fontSize: 14,
-    color: Colors.textLight,
-    marginBottom: 4,
-  },
-  conversaFooter: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-  },
-  conversaDate: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-  statusBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: '#10b981',
-  },
-  emptyContainer: {
-    flex: 1,
+  shortcutIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: `${Colors.primary}15`,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
-    paddingVertical: 64,
   },
-  emptyText: {
+  shortcutInfo: {
+    flex: 1,
+  },
+  shortcutTitle: {
     fontSize: 16,
-    color: Colors.textLight,
-    marginTop: 16,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    marginBottom: 3,
+  },
+  shortcutSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
   formContainer: {
     padding: 16,
@@ -349,7 +294,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
     textAlign: 'center' as const,
   },
   label: {
