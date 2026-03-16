@@ -10,23 +10,42 @@ if (!HAS_DB_CONFIG) {
 }
 
 async function dbQuery(query: string, vars?: Record<string, any>) {
+  let fullQuery = query;
+
+  if (vars && Object.keys(vars).length > 0) {
+    const letStatements = Object.entries(vars)
+      .map(([key, value]) => `LET $${key} = ${JSON.stringify(value)};`)
+      .join(' ');
+    fullQuery = `${letStatements} ${query}`;
+  }
+
   const response = await fetch(`${DB_ENDPOINT}/sql`, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
+      'Content-Type': 'text/plain',
       'NS': DB_NAMESPACE as string,
       'DB': DB_NAMESPACE as string,
       'Authorization': `Bearer ${DB_TOKEN}`,
     },
-    body: JSON.stringify({ query, vars }),
+    body: fullQuery,
   });
 
   if (!response.ok) {
-    throw new Error(`DB query failed: ${response.statusText}`);
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(`DB query failed: ${text || response.statusText}`);
   }
 
   const results = await response.json();
+
+  if (Array.isArray(results)) {
+    for (const result of results) {
+      if (result.status === 'ERR') {
+        console.warn(`SurrealDB query warning: ${result.result}`);
+      }
+    }
+  }
+
   return results;
 }
 
@@ -37,12 +56,12 @@ export async function read<T>(name: string, fallback: T): Promise<T> {
 
   try {
     const result = await dbQuery(`SELECT * FROM ${name}`);
-    
+
     if (result && result[0]?.result && result[0].result.length > 0) {
       console.log(`📁 Loaded ${result[0].result.length} items from ${name}`);
       return result[0].result as T;
     }
-    
+
     console.log(`📁 No data in ${name}, using fallback`);
     if (Array.isArray(fallback) && fallback.length > 0) {
       await write(name, fallback);
@@ -60,12 +79,17 @@ export async function write<T>(name: string, data: T): Promise<void> {
   }
 
   try {
-    await dbQuery(`DELETE ${name}`);
-    
+    try {
+      await dbQuery(`DELETE ${name}`);
+    } catch (deleteError) {
+      console.warn(`Could not delete ${name} (table may not exist yet):`, deleteError);
+    }
+
     if (Array.isArray(data)) {
       for (const item of data) {
-        const id = item.id || Math.random().toString(36).substring(7);
-        await dbQuery(`CREATE ${name}:${id} CONTENT $item`, { item });
+        const rawId = item.id || Math.random().toString(36).substring(7);
+        const safeId = String(rawId).replace(/[^a-zA-Z0-9_-]/g, '_');
+        await dbQuery(`CREATE ${name}:⟨${safeId}⟩ CONTENT $item`, { item });
       }
       console.log(`✅ Wrote ${data.length} items to ${name}`);
     } else {
@@ -84,7 +108,7 @@ function readFromMemory<T>(name: string, fallback: T): T {
     console.log(`📁 Loaded ${name} from memory`);
     return JSON.parse(JSON.stringify(stored)) as T;
   }
-  
+
   console.log(`📁 No data in memory for ${name}, using fallback`);
   writeToMemory(name, fallback);
   return JSON.parse(JSON.stringify(fallback)) as T;
