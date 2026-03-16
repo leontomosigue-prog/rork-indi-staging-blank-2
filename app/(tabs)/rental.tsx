@@ -13,12 +13,11 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList, ChevronDown, Camera, Check, Filter, CheckCircle } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Calendar, ImageIcon, X, ClipboardList, ChevronDown, Camera, Check, Filter } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
-import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
@@ -77,11 +76,13 @@ const MACHINE_TYPES: MachineType[] = [
 
 export default function RentalScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const {
     listMaquinas = () => [],
     criarMaquina = async () => null,
     atualizarMaquina = async () => null,
     removerMaquina = async () => {},
+    criarConversa = async () => '',
     isLoading = false,
   } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -106,19 +107,8 @@ export default function RentalScreen() {
     localImages: [],
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [successVisible, setSuccessVisible] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onSuccess: (_data, vars) => {
-      const msg = (vars.payload as any)?.successMsg ?? 'Solicitação enviada com sucesso!';
-      setSuccessMsg(msg);
-      setSuccessVisible(true);
-    },
-    onError: (err) => {
-      Alert.alert('Erro', err.message || 'Não foi possível criar a solicitação');
-    },
-  });
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
@@ -228,20 +218,28 @@ export default function RentalScreen() {
     );
   };
 
-  const handleRequestRental = (machine: any) => {
+  const handleRequestRental = async (machine: any) => {
     if (!user) return;
-    createTicketMutation.mutate({
-      userId: user.id,
-      type: 'rental_request',
-      area: 'locacao',
-      payload: {
-        machineName: machine.nome,
-        description: `Solicitação de locação: ${machine.nome} - ${machine.marca} ${machine.modelo}`,
-        diaria: machine.diaria,
-        mensal: machine.mensal,
-        successMsg: `Sua solicitação de locação para ${machine.nome} foi enviada. Em breve um atendente entrará em contato.`,
-      },
-    });
+
+    setIsRequesting(true);
+    try {
+      const conversaId = await criarConversa({
+        area: 'Locação',
+        titulo: `Locação - ${machine.nome}`,
+        mensagemInicial: `Olá, gostaria de solicitar a locação de ${machine.nome} - ${machine.marca} ${machine.modelo}.`,
+      });
+
+      if (conversaId) {
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a solicitação');
+      }
+    } catch (error) {
+      console.error('Error requesting rental:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao solicitar a locação');
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   const handlePickImages = async () => {
@@ -275,36 +273,41 @@ export default function RentalScreen() {
     setCustomForm({ ...customForm, localImages: updated });
   };
 
-  const handleSubmitCustomRequest = () => {
+  const handleSubmitCustomRequest = async () => {
     if (!customForm.tipoMaquina || !customForm.dataInicio || !customForm.dataFim) {
       Alert.alert('Campos obrigatórios', 'Preencha pelo menos o tipo de máquina e o período desejado.');
       return;
     }
-    if (!user) return;
 
-    createTicketMutation.mutate(
-      {
-        userId: user.id,
-        type: 'rental_request',
-        area: 'locacao',
-        payload: {
-          tipoMaquina: customForm.tipoMaquina,
-          capacidadeCarga: customForm.capacidadeCarga,
-          elevacaoNecessaria: customForm.elevacaoNecessaria,
-          dataInicio: customForm.dataInicio,
-          dataFim: customForm.dataFim,
-          description: customForm.descricao || 'Solicitação personalizada de locação',
-          successMsg: 'Sua solicitação personalizada de locação foi enviada. Em breve um atendente entrará em contato.',
-        },
-        photos: customForm.localImages.length > 0 ? customForm.localImages : undefined,
-      },
-      {
-        onSuccess: () => {
-          setIsCustomRequestVisible(false);
-          resetCustomForm();
-        },
+    setIsSubmittingCustom(true);
+    try {
+      const mensagem = `📋 SOLICITAÇÃO PERSONALIZADA DE LOCAÇÃO\n\n` +
+        `Tipo de máquina: ${customForm.tipoMaquina}\n` +
+        `Capacidade de carga: ${customForm.capacidadeCarga || 'Não informado'}\n` +
+        `Elevação necessária: ${customForm.elevacaoNecessaria || 'Não informado'}\n` +
+        `Período: ${customForm.dataInicio} até ${customForm.dataFim}\n` +
+        `Fotos do local/carga: ${customForm.localImages.length > 0 ? `${customForm.localImages.length} imagem(ns) anexada(s)` : 'Nenhuma'}\n` +
+        `\nDescrição / Observações:\n${customForm.descricao || 'Sem observações'}`;
+
+      const conversaId = await criarConversa({
+        area: 'Locação',
+        titulo: `Solicitação Personalizada - ${customForm.tipoMaquina}`,
+        mensagemInicial: mensagem,
+      });
+
+      if (conversaId) {
+        setIsCustomRequestVisible(false);
+        resetCustomForm();
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível enviar a solicitação');
       }
-    );
+    } catch (error) {
+      console.error('Error submitting custom request:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao enviar a solicitação');
+    } finally {
+      setIsSubmittingCustom(false);
+    }
   };
 
   const selectedMachineType = MACHINE_TYPES.find((m) => m.id === customForm.tipoMaquina);
@@ -358,16 +361,10 @@ export default function RentalScreen() {
           <TouchableOpacity
             style={[styles.actionButton, styles.requestButton]}
             onPress={() => handleRequestRental(item)}
-            disabled={createTicketMutation.isPending}
+            disabled={isRequesting}
           >
-            {createTicketMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Calendar size={18} color="#fff" />
-                <Text style={styles.requestButtonText}>Solicitar</Text>
-              </>
-            )}
+            <Calendar size={18} color="#fff" />
+            <Text style={styles.requestButtonText}>Solicitar</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -653,38 +650,17 @@ export default function RentalScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.submitButton, createTicketMutation.isPending && styles.submitButtonDisabled]}
+              style={[styles.submitButton, isSubmittingCustom && styles.submitButtonDisabled]}
               onPress={handleSubmitCustomRequest}
-              disabled={createTicketMutation.isPending}
+              disabled={isSubmittingCustom}
             >
-              {createTicketMutation.isPending ? (
+              {isSubmittingCustom ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>Enviar Solicitação</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={successVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSuccessVisible(false)}
-      >
-        <View style={styles.successOverlay}>
-          <View style={styles.successCard}>
-            <CheckCircle size={52} color="#34C759" />
-            <Text style={styles.successTitle}>Solicitação Enviada!</Text>
-            <Text style={styles.successMsg}>{successMsg}</Text>
-            <TouchableOpacity
-              style={styles.successBtn}
-              onPress={() => setSuccessVisible(false)}
-            >
-              <Text style={styles.successBtnText}>Entendido</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </Modal>
 
@@ -1250,46 +1226,5 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: '#fff',
-  },
-  successOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    padding: 32,
-  },
-  successCard: {
-    backgroundColor: Colors.cardBackground ?? '#1C1C1E',
-    borderRadius: 20,
-    padding: 28,
-    alignItems: 'center' as const,
-    gap: 14,
-    width: '100%',
-    maxWidth: 360,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: Colors.text,
-  },
-  successMsg: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center' as const,
-    lineHeight: 21,
-  },
-  successBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 40,
-    marginTop: 4,
-  },
-  successBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700' as const,
   },
 });

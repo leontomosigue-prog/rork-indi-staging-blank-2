@@ -326,7 +326,7 @@ app.use('/trpc/*', async (c, next) => {
 
 app.all('/trpc/*', (c) => {
   return fetchRequestHandler({
-    endpoint: '/api/trpc',
+    endpoint: '/trpc',
     req: c.req.raw,
     router: appRouter,
     createContext,

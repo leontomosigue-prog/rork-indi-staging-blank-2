@@ -12,11 +12,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Stack } from 'expo-router';
-import { Plus, Edit2, Trash2, ShoppingCart, ImageIcon, X, CheckCircle } from 'lucide-react-native';
+import { Stack, useRouter } from 'expo-router';
+import { Plus, Edit2, Trash2, ShoppingCart, ImageIcon, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
-import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
@@ -30,11 +29,13 @@ interface MachineFormData {
 
 export default function SalesScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const {
     listMaquinas = () => [],
     criarMaquina = async () => null,
     atualizarMaquina = async () => null,
     removerMaquina = async () => {},
+    criarConversa = async () => '',
     isLoading = false,
   } = useMockData() ?? {};
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -47,19 +48,7 @@ export default function SalesScreen() {
     imageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [successVisible, setSuccessVisible] = useState(false);
-  const [successMachineName, setSuccessMachineName] = useState('');
-
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onSuccess: (_data, vars) => {
-      const machineName = (vars.payload as any)?.machineName ?? '';
-      setSuccessMachineName(machineName);
-      setSuccessVisible(true);
-    },
-    onError: (err) => {
-      Alert.alert('Erro', err.message || 'Não foi possível criar a solicitação');
-    },
-  });
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const maquinas = listMaquinas('venda');
 
@@ -148,18 +137,28 @@ export default function SalesScreen() {
     );
   };
 
-  const handleRequestQuote = (machine: any) => {
+  const handleRequestQuote = async (machine: any) => {
     if (!user) return;
-    createTicketMutation.mutate({
-      userId: user.id,
-      type: 'sales_quote',
-      area: 'vendas',
-      payload: {
-        machineName: machine.nome,
-        description: `Orçamento para ${machine.nome} - ${machine.marca} ${machine.modelo}`,
-        preco: machine.preco,
-      },
-    });
+
+    setIsRequesting(true);
+    try {
+      const conversaId = await criarConversa({
+        area: 'Vendas',
+        titulo: `Orçamento - ${machine.nome}`,
+        mensagemInicial: `Olá, gostaria de solicitar um orçamento para ${machine.nome} - ${machine.marca} ${machine.modelo}.`,
+      });
+
+      if (conversaId) {
+        router.push(`/chat/${conversaId}` as any);
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a solicitação');
+      }
+    } catch (error) {
+      console.error('Error requesting quote:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao solicitar o orçamento');
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   const renderMachine = ({ item }: any) => (
@@ -206,16 +205,10 @@ export default function SalesScreen() {
           <TouchableOpacity
             style={[styles.actionButton, styles.quoteButton]}
             onPress={() => handleRequestQuote(item)}
-            disabled={createTicketMutation.isPending}
+            disabled={isRequesting}
           >
-            {createTicketMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <ShoppingCart size={18} color="#fff" />
-                <Text style={styles.quoteButtonText}>Orçamento</Text>
-              </>
-            )}
+            <ShoppingCart size={18} color="#fff" />
+            <Text style={styles.quoteButtonText}>Orçamento</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -257,31 +250,6 @@ export default function SalesScreen() {
           </View>
         }
       />
-
-      <Modal
-        visible={successVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSuccessVisible(false)}
-      >
-        <View style={styles.successOverlay}>
-          <View style={styles.successCard}>
-            <CheckCircle size={52} color="#34C759" />
-            <Text style={styles.successTitle}>Orçamento Solicitado!</Text>
-            <Text style={styles.successMsg}>
-              Sua solicitação para{' '}
-              <Text style={{ fontWeight: '700' }}>{successMachineName}</Text>{' '}
-              foi enviada. Em breve um de nossos atendentes entrará em contato.
-            </Text>
-            <TouchableOpacity
-              style={styles.successBtn}
-              onPress={() => setSuccessVisible(false)}
-            >
-              <Text style={styles.successBtnText}>Entendido</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={isModalVisible}
@@ -561,47 +529,6 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: Colors.text,
-    fontSize: 16,
-    fontWeight: '700' as const,
-  },
-  successOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    padding: 32,
-  },
-  successCard: {
-    backgroundColor: Colors.cardBackground ?? '#1C1C1E',
-    borderRadius: 20,
-    padding: 28,
-    alignItems: 'center' as const,
-    gap: 14,
-    width: '100%',
-    maxWidth: 360,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: Colors.text,
-  },
-  successMsg: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center' as const,
-    lineHeight: 21,
-  },
-  successBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 40,
-    marginTop: 4,
-  },
-  successBtnText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '700' as const,
   },
