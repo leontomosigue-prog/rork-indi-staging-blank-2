@@ -60,6 +60,7 @@ export default function PartsScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successPartName, setSuccessPartName] = useState('');
+  const [pendingPartId, setPendingPartId] = useState<string | null>(null);
 
   const createTicketMutation = trpc.tickets.create.useMutation({
     onSuccess: () => {
@@ -181,9 +182,10 @@ export default function PartsScreen() {
   };
 
   const handleRequestPart = (part: any) => {
-    if (!user) return;
+    if (!user || pendingPartId) return;
 
     console.log('Solicitando peça via ticket:', part.sku);
+    setPendingPartId(part.id);
     createTicketMutation.mutate(
       {
         userId: user.id,
@@ -205,8 +207,12 @@ export default function PartsScreen() {
       },
       {
         onSuccess: () => {
+          setPendingPartId(null);
           setSuccessPartName(part.nome);
           setSuccessModalVisible(true);
+        },
+        onError: () => {
+          setPendingPartId(null);
         },
       }
     );
@@ -261,11 +267,11 @@ export default function PartsScreen() {
           </>
         ) : !canViewOnly ? (
           <TouchableOpacity
-            style={[styles.actionButton, styles.requestButton]}
+            style={[styles.actionButton, styles.requestButton, !!pendingPartId && styles.submitButtonDisabled]}
             onPress={() => handleRequestPart(item)}
-            disabled={createTicketMutation.isPending}
+            disabled={!!pendingPartId}
           >
-            {createTicketMutation.isPending ? (
+            {pendingPartId === item.id ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
@@ -355,6 +361,7 @@ export default function PartsScreen() {
         data={filteredParts}
         keyExtractor={(item) => item.id}
         renderItem={renderPart}
+        extraData={pendingPartId}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
