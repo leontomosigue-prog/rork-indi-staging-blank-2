@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
 import { read, write } from "@/backend/data/store";
-import { Ticket, User } from "@/backend/data/schemas";
+import { Ticket } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 
 export default publicProcedure
@@ -12,13 +12,6 @@ export default publicProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const users = await read<User[]>("users", []);
-    const user = users.find(u => u.id === input.userId);
-
-    if (!user) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não encontrado" });
-    }
-
     const tickets = await read<Ticket[]>("tickets", []);
     const ticketIndex = tickets.findIndex(t => t.id === input.ticketId);
 

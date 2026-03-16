@@ -5,7 +5,6 @@ import { appRouter } from './trpc/app-router';
 import { createContext } from './trpc/create-context';
 import { read, write } from './data/store';
 import { User } from './data/schemas';
-import { nanoid } from 'nanoid';
 
 const BACKEND_ID = 'indi-backend-hono';
 const BACKEND_VERSION = '1.0.0';
@@ -31,7 +30,7 @@ async function initializeData() {
     
     const seedUsers: User[] = [
       {
-        id: nanoid(),
+        id: "admin_user_001",
         name: "Admin INDI",
         email: "admin@indi.com",
         passwordHash: "admin123",
@@ -40,7 +39,7 @@ async function initializeData() {
         updatedAt: new Date(),
       },
       {
-        id: nanoid(),
+        id: "sales_user_001",
         name: "João Silva (Vendas)",
         email: "vendas@indi.com",
         passwordHash: "vendas123",
@@ -49,7 +48,7 @@ async function initializeData() {
         updatedAt: new Date(),
       },
       {
-        id: nanoid(),
+        id: "rental_user_001",
         name: "Maria Santos (Locação)",
         email: "locacao@indi.com",
         passwordHash: "locacao123",
@@ -58,7 +57,7 @@ async function initializeData() {
         updatedAt: new Date(),
       },
       {
-        id: nanoid(),
+        id: "tech_user_001",
         name: "Carlos Oliveira (Técnico)",
         email: "tecnico@indi.com",
         passwordHash: "tecnico123",
@@ -67,7 +66,7 @@ async function initializeData() {
         updatedAt: new Date(),
       },
       {
-        id: nanoid(),
+        id: "parts_user_001",
         name: "Ana Costa (Peças)",
         email: "pecas@indi.com",
         passwordHash: "pecas123",
@@ -76,10 +75,19 @@ async function initializeData() {
         updatedAt: new Date(),
       },
       {
-        id: nanoid(),
+        id: "client_user_001",
         name: "Cliente Teste",
         email: "cliente@indi.com",
         passwordHash: "cliente123",
+        roles: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "client_user_002",
+        name: "Pedro Almeida",
+        email: "pedro.teste@email.com",
+        passwordHash: "teste123",
         roles: [],
         createdAt: new Date(),
         updatedAt: new Date(),
