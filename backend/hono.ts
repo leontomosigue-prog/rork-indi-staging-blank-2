@@ -272,7 +272,7 @@ app.all('/__echo_trpc_path/*', (c) => {
 app.use('/trpc/*', trpcServer({
   router: appRouter,
   createContext,
-  endpoint: '/trpc',
+  endpoint: '/api/trpc',
 }));
 
 app.use('/trpc/*', async (c, next) => {
