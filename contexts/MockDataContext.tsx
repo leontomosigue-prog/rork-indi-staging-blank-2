@@ -129,41 +129,115 @@ const MOCK_MAQUINAS_LOCACAO: Maquina[] = [
   },
 ];
 
+const PECAS_VERSION = 'v2';
+
 const MOCK_PECAS: Peca[] = [
   {
-    id: 'p1',
-    sku: 'HYD-001',
-    nome: 'Válvula Hidráulica',
+    id: 'p01',
+    sku: 'BAT-001',
+    nome: 'Bateria Tracionária 24V',
+    categoria: 'eletrica',
+    preco: 1800,
+    estoque: 8,
+    imageUrl: 'https://images.unsplash.com/photo-1620714223084-8fcacc2dbe2d?w=400',
+  },
+  {
+    id: 'p02',
+    sku: 'PNE-001',
+    nome: 'Pneu Maciço 18x7-8',
+    categoria: 'outros',
+    preco: 420,
+    estoque: 12,
+    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
+  },
+  {
+    id: 'p03',
+    sku: 'MAN-001',
+    nome: 'Mangueira Hidráulica',
     categoria: 'hidraulica',
-    preco: 150,
-    estoque: 10,
+    preco: 95,
+    estoque: 30,
     imageUrl: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
   },
   {
-    id: 'p2',
-    sku: 'ELE-002',
-    nome: 'Controlador Elétrico',
-    categoria: 'eletrica',
-    preco: 350,
-    estoque: 5,
-    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400',
+    id: 'p04',
+    sku: 'BOM-001',
+    nome: 'Bomba Hidráulica',
+    categoria: 'hidraulica',
+    preco: 980,
+    estoque: 4,
+    imageUrl: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400',
   },
   {
-    id: 'p3',
-    sku: 'MOT-003',
-    nome: 'Filtro de Óleo',
+    id: 'p05',
+    sku: 'ROL-001',
+    nome: 'Rolamento Esférico',
     categoria: 'motor',
-    preco: 80,
-    estoque: 20,
+    preco: 65,
+    estoque: 40,
     imageUrl: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400',
   },
   {
-    id: 'p4',
-    sku: 'HYD-004',
-    nome: 'Garfo para Empilhadeira',
+    id: 'p06',
+    sku: 'COR-001',
+    nome: 'Correia Dentada',
+    categoria: 'motor',
+    preco: 130,
+    estoque: 15,
+    imageUrl: 'https://images.unsplash.com/photo-1590859808308-3d2d9c515b1a?w=400',
+  },
+  {
+    id: 'p07',
+    sku: 'CON-001',
+    nome: 'Contatora Elétrica 24V',
+    categoria: 'eletrica',
+    preco: 220,
+    estoque: 10,
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400',
+  },
+  {
+    id: 'p08',
+    sku: 'FIL-001',
+    nome: 'Filtro Hidráulico',
     categoria: 'hidraulica',
-    preco: 1500,
-    estoque: 3,
+    preco: 75,
+    estoque: 25,
+    imageUrl: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
+  },
+  {
+    id: 'p09',
+    sku: 'KIT-001',
+    nome: 'Kit Vedação de Cilindro',
+    categoria: 'hidraulica',
+    preco: 180,
+    estoque: 18,
+    imageUrl: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400',
+  },
+  {
+    id: 'p10',
+    sku: 'SEN-001',
+    nome: 'Sensor de Posição',
+    categoria: 'eletrica',
+    preco: 310,
+    estoque: 7,
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400',
+  },
+  {
+    id: 'p11',
+    sku: 'FLU-001',
+    nome: 'Fluido Hidráulico 20L',
+    categoria: 'hidraulica',
+    preco: 145,
+    estoque: 22,
+    imageUrl: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
+  },
+  {
+    id: 'p12',
+    sku: 'CAB-001',
+    nome: 'Cabo de Aço 6mm',
+    categoria: 'outros',
+    preco: 55,
+    estoque: 50,
     imageUrl: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400',
   },
 ];
@@ -265,7 +339,13 @@ export const [MockDataProvider, useMockData] = createContextHook(() => {
         await AsyncStorage.setItem(STORAGE_KEYS.MAQUINAS, JSON.stringify(todasMaquinas));
       }
 
-      if (pecasString) {
+      const pecasVersionKey = '@indi:mock:pecas_version';
+      const storedPecasVersion = await AsyncStorage.getItem(pecasVersionKey);
+      if (storedPecasVersion !== PECAS_VERSION) {
+        setPecas(MOCK_PECAS);
+        await AsyncStorage.setItem(STORAGE_KEYS.PECAS, JSON.stringify(MOCK_PECAS));
+        await AsyncStorage.setItem(pecasVersionKey, PECAS_VERSION);
+      } else if (pecasString) {
         setPecas(JSON.parse(pecasString));
       } else {
         setPecas(MOCK_PECAS);
