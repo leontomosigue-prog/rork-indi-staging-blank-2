@@ -97,8 +97,8 @@ export async function write<T>(name: string, data: T): Promise<void> {
       console.log(`✅ Wrote data to ${name}`);
     }
   } catch (error) {
-    console.error(`Error writing ${name}:`, error);
-    throw error;
+    console.warn(`⚠️ DB write failed for ${name}, falling back to memory:`, error);
+    writeToMemory(name, data);
   }
 }
 
