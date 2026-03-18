@@ -49,59 +49,6 @@ async function dbQuery(query: string, vars?: Record<string, any>) {
   return results;
 }
 
-export async function read<T>(name: string, fallback: T): Promise<T> {
-  if (!HAS_DB_CONFIG) {
-    return readFromMemory(name, fallback);
-  }
-
-  try {
-    const result = await dbQuery(`SELECT * FROM ${name}`);
-
-    if (result && result[0]?.result && result[0].result.length > 0) {
-      console.log(`📁 Loaded ${result[0].result.length} items from ${name}`);
-      return result[0].result as T;
-    }
-
-    console.log(`📁 No data in ${name}, using fallback`);
-    if (Array.isArray(fallback) && fallback.length > 0) {
-      await write(name, fallback);
-    }
-    return fallback;
-  } catch (error) {
-    console.error(`Error reading ${name}:`, error);
-    return fallback;
-  }
-}
-
-export async function write<T>(name: string, data: T): Promise<void> {
-  if (!HAS_DB_CONFIG) {
-    return writeToMemory(name, data);
-  }
-
-  try {
-    try {
-      await dbQuery(`DELETE ${name}`);
-    } catch (deleteError) {
-      console.warn(`Could not delete ${name} (table may not exist yet):`, deleteError);
-    }
-
-    if (Array.isArray(data)) {
-      for (const item of data) {
-        const rawId = item.id || Math.random().toString(36).substring(7);
-        const safeId = String(rawId).replace(/[^a-zA-Z0-9_-]/g, '_');
-        await dbQuery(`CREATE ${name}:⟨${safeId}⟩ CONTENT $item`, { item });
-      }
-      console.log(`✅ Wrote ${data.length} items to ${name}`);
-    } else {
-      await dbQuery(`CREATE ${name}:data CONTENT $item`, { item: data });
-      console.log(`✅ Wrote data to ${name}`);
-    }
-  } catch (error) {
-    console.warn(`⚠️ DB write failed for ${name}, falling back to memory:`, error);
-    writeToMemory(name, data);
-  }
-}
-
 function readFromMemory<T>(name: string, fallback: T): T {
   if (memoryStore.has(name)) {
     const stored = memoryStore.get(name);
@@ -118,4 +65,66 @@ function writeToMemory<T>(name: string, data: T): void {
   memoryStore.set(name, JSON.parse(JSON.stringify(data)));
   const count = Array.isArray(data) ? data.length : 1;
   console.log(`✅ Wrote ${count} item(s) to memory store [${name}]`);
+}
+
+export async function read<T>(name: string, fallback: T): Promise<T> {
+  if (!HAS_DB_CONFIG) {
+    return readFromMemory(name, fallback);
+  }
+
+  try {
+    const result = await dbQuery(`SELECT * FROM ${name}`);
+
+    if (result && result[0]?.result && result[0].result.length > 0) {
+      const data = result[0].result as T;
+      console.log(`📁 Loaded ${(result[0].result as any[]).length} items from DB [${name}]`);
+      writeToMemory(name, data);
+      return data;
+    }
+
+    console.log(`📁 No data in DB for ${name}, checking memory...`);
+    if (memoryStore.has(name)) {
+      console.log(`📁 Found ${name} in memory cache`);
+      return readFromMemory(name, fallback);
+    }
+
+    console.log(`📁 No data anywhere for ${name}, using fallback`);
+    if (Array.isArray(fallback) && fallback.length > 0) {
+      await write(name, fallback);
+    }
+    return fallback;
+  } catch (error) {
+    console.error(`Error reading ${name} from DB, falling back to memory:`, error);
+    return readFromMemory(name, fallback);
+  }
+}
+
+export async function write<T>(name: string, data: T): Promise<void> {
+  writeToMemory(name, data);
+
+  if (!HAS_DB_CONFIG) {
+    return;
+  }
+
+  try {
+    try {
+      await dbQuery(`DELETE ${name}`);
+    } catch (deleteError) {
+      console.warn(`Could not delete ${name} (table may not exist yet):`, deleteError);
+    }
+
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        const rawId = item.id || Math.random().toString(36).substring(7);
+        const safeId = String(rawId).replace(/[^a-zA-Z0-9_-]/g, '_');
+        await dbQuery(`CREATE ${name}:⟨${safeId}⟩ CONTENT $item`, { item });
+      }
+      console.log(`✅ Wrote ${data.length} items to DB [${name}]`);
+    } else {
+      await dbQuery(`CREATE ${name}:data CONTENT $item`, { item: data });
+      console.log(`✅ Wrote data to DB [${name}]`);
+    }
+  } catch (error) {
+    console.warn(`⚠️ DB write failed for ${name}, data is safe in memory:`, error);
+  }
 }
