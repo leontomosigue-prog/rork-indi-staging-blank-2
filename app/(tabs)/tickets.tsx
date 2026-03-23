@@ -509,7 +509,6 @@ function ChamadosTab() {
     { userId: user?.id ?? '', area: employeeArea ?? undefined },
     {
       enabled: !!user?.id && canSeeQueue,
-      refetchInterval: 15000,
       placeholderData: (prev: any) => prev,
     }
   );
@@ -518,7 +517,6 @@ function ChamadosTab() {
     { userId: user?.id ?? '' },
     {
       enabled: !!user?.id && canSeeQueue,
-      refetchInterval: 15000,
       placeholderData: (prev: any) => prev,
     }
   );
@@ -527,7 +525,6 @@ function ChamadosTab() {
     { userId: user?.id ?? '', area: employeeArea ?? undefined },
     {
       enabled: !!user?.id && canSeeQueue,
-      refetchInterval: 30000,
       placeholderData: (prev: any) => prev,
     }
   );
