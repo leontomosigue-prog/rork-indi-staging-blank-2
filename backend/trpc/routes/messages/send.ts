@@ -32,10 +32,8 @@ export default publicProcedure
     const conversation = conversations[conversationIndex];
 
     if (!conversation.participantsIds.includes(input.userId)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "User is not a participant in this conversation",
-      });
+      conversations[conversationIndex].participantsIds.push(input.userId);
+      await write("conversations", conversations);
     }
 
     const messages = await read<Message[]>("messages", []);

@@ -39,6 +39,9 @@ export default publicProcedure
     if (ticket.assigneeId && !participantsIds.includes(ticket.assigneeId)) {
       participantsIds.push(ticket.assigneeId);
     }
+    if (!participantsIds.includes(input.userId)) {
+      participantsIds.push(input.userId);
+    }
 
     const now = new Date();
     const newConversation: Conversation = {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { read } from "@/backend/data/store";
+import { read, write } from "@/backend/data/store";
 import { Message, Conversation, User } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 
@@ -27,10 +27,12 @@ export default publicProcedure
     }
 
     if (!conversation.participantsIds.includes(input.userId)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "User is not a participant in this conversation",
-      });
+      const updatedConversations = conversations.map((c: any) =>
+        c.id === input.conversationId
+          ? { ...c, participantsIds: [...c.participantsIds, input.userId] }
+          : c
+      );
+      await write("conversations", updatedConversations);
     }
 
     const messages = await read<Message[]>("messages", []);
