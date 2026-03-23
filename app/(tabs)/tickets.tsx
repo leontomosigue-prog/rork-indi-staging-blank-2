@@ -496,6 +496,16 @@ function ChamadosTab() {
     }
   );
 
+  const resolvedQuery = trpc.tickets.listResolved.useQuery(
+    { userId: user?.id ?? '', area: employeeArea ?? undefined },
+    {
+      enabled: !!user?.id && canSeeQueue,
+      refetchInterval: 30000,
+    }
+  );
+
+  const [showResolved, setShowResolved] = useState(false);
+
   const myTicketsQuery = trpc.tickets.listMine.useQuery(
     { userId: user?.id ?? '' },
     {
@@ -616,11 +626,13 @@ function ChamadosTab() {
     void availableQuery.refetch();
     void assignedQuery.refetch();
     void myTicketsQuery.refetch();
+    void resolvedQuery.refetch();
   };
 
   const available: any[] = availableQuery.data ?? [];
   const assigned: any[] = assignedQuery.data ?? [];
   const myTickets: any[] = myTicketsQuery.data ?? [];
+  const resolved: any[] = resolvedQuery.data ?? [];
 
   const isLoading =
     (canSeeQueue && (availableQuery.isLoading || assignedQuery.isLoading)) ||
@@ -708,6 +720,50 @@ function ChamadosTab() {
               ))
             )}
           </View>
+
+          <Pressable
+            style={styles.resolvedToggle}
+            onPress={() => setShowResolved(v => !v)}
+          >
+            <View style={styles.resolvedToggleLeft}>
+              <CheckCircle size={15} color="#34C759" />
+              <Text style={styles.resolvedToggleText}>Resolvidas</Text>
+              {resolved.length > 0 && (
+                <View style={styles.resolvedCountBadge}>
+                  <Text style={styles.resolvedCountText}>{resolved.length}</Text>
+                </View>
+              )}
+            </View>
+            <ChevronRight
+              size={16}
+              color="rgba(255,255,255,0.3)"
+              style={{ transform: [{ rotate: showResolved ? '90deg' : '0deg' }] }}
+            />
+          </Pressable>
+
+          {showResolved && (
+            <View style={styles.listSection}>
+              {resolvedQuery.isLoading ? (
+                <View style={styles.resolvedLoadingRow}>
+                  <ActivityIndicator size="small" color="#34C759" />
+                </View>
+              ) : resolved.length === 0 ? (
+                <EmptyState
+                  icon={CheckCircle}
+                  title="Nenhum chamado resolvido"
+                  subtitle="Chamados marcados como resolvidos aparecerão aqui"
+                />
+              ) : (
+                resolved.map((ticket: any) => (
+                  <TicketCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    showArea={isAdminUser}
+                  />
+                ))
+              )}
+            </View>
+          )}
         </>
       )}
 
@@ -1557,6 +1613,48 @@ const styles = StyleSheet.create({
   refreshBtnText: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.3)',
+  },
+  resolvedToggle: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 4,
+    backgroundColor: 'rgba(52,199,89,0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.2)',
+  },
+  resolvedToggleLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  resolvedToggleText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#34C759',
+  },
+  resolvedCountBadge: {
+    backgroundColor: 'rgba(52,199,89,0.2)',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 6,
+  },
+  resolvedCountText: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: '#34C759',
+  },
+  resolvedLoadingRow: {
+    paddingVertical: 20,
+    alignItems: 'center' as const,
   },
   senhasContainer: {
     flex: 1,
