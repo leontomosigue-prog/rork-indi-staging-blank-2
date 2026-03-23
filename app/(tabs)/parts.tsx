@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
-import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X, CheckCircle } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X, CheckCircle, ShoppingCart, Minus, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
 import { trpc } from '@/lib/trpc';
@@ -27,6 +27,11 @@ interface PartFormData {
   preco: string;
   estoque: string;
   imageUrl: string;
+}
+
+interface CartItem {
+  part: any;
+  quantity: number;
 }
 
 const CATEGORIES = [
@@ -45,6 +50,7 @@ export default function PartsScreen() {
     removerPeca = async () => {},
     isLoading = false,
   } = useMockData() ?? {};
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingPart, setEditingPart] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -59,8 +65,10 @@ export default function PartsScreen() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const [successPartName, setSuccessPartName] = useState('');
-  const [pendingPartId, setPendingPartId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartVisible, setCartVisible] = useState(false);
 
   const createTicketMutation = trpc.tickets.create.useMutation({
     onSuccess: () => {
@@ -81,7 +89,6 @@ export default function PartsScreen() {
 
   const filteredParts = useMemo(() => {
     let result = pecas;
-
     if (searchText) {
       const search = searchText.toLowerCase();
       result = result.filter(
@@ -90,13 +97,16 @@ export default function PartsScreen() {
           part.sku.toLowerCase().includes(search)
       );
     }
-
     if (selectedCategory) {
       result = result.filter((part) => part.categoria === selectedCategory);
     }
-
     return result;
   }, [pecas, searchText, selectedCategory]);
+
+  const cartTotalItems = useMemo(
+    () => cart.reduce((sum, item) => sum + item.quantity, 0),
+    [cart]
+  );
 
   const resetForm = () => {
     setFormData({ sku: '', nome: '', categoria: 'outros', preco: '', estoque: '', imageUrl: '' });
@@ -125,14 +135,12 @@ export default function PartsScreen() {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
-
     const preco = parseFloat(formData.preco);
     const estoque = parseInt(formData.estoque, 10);
     if (isNaN(preco) || isNaN(estoque)) {
       Alert.alert('Erro', 'Valores inválidos');
       return;
     }
-
     setIsSaving(true);
     try {
       if (editingPart) {
@@ -181,38 +189,65 @@ export default function PartsScreen() {
     );
   };
 
-  const handleRequestPart = (part: any) => {
-    if (!user || pendingPartId) return;
+  const addToCart = useCallback((part: any) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.part.id === part.id);
+      if (existing) {
+        return prev.map(item =>
+          item.part.id === part.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { part, quantity: 1 }];
+    });
+  }, []);
 
-    console.log('Solicitando peça via ticket:', part.sku);
-    setPendingPartId(part.id);
+  const removeFromCart = useCallback((partId: string) => {
+    setCart(prev => prev.filter(item => item.part.id !== partId));
+  }, []);
+
+  const updateQuantity = useCallback((partId: string, qty: number) => {
+    if (qty <= 0) {
+      setCart(prev => prev.filter(item => item.part.id !== partId));
+      return;
+    }
+    setCart(prev =>
+      prev.map(item => item.part.id === partId ? { ...item, quantity: qty } : item)
+    );
+  }, []);
+
+  const handleSubmitCart = () => {
+    if (!user || cart.length === 0) return;
+    const totalItems = cart.reduce((sum, i) => sum + i.quantity, 0);
+    const partNames = cart.map(i => `${i.part.nome} (x${i.quantity})`).join(', ');
+    const partsPayload = cart.map(item => ({
+      id: item.part.id,
+      nome: item.part.nome,
+      sku: item.part.sku,
+      categoria: item.part.categoria,
+      preco: item.part.preco,
+      estoque: item.part.estoque,
+      quantidade: item.quantity,
+    }));
+
     createTicketMutation.mutate(
       {
         userId: user.id,
         type: 'parts_request',
         area: 'pecas',
         payload: {
-          description: `Solicitação de peça: ${part.nome} (SKU: ${part.sku})`,
-          parts: [
-            {
-              id: part.id,
-              nome: part.nome,
-              sku: part.sku,
-              categoria: part.categoria,
-              preco: part.preco,
-              estoque: part.estoque,
-            },
-          ],
+          description: `Pedido de ${totalItems} peça(s): ${partNames}`,
+          parts: partsPayload,
         },
       },
       {
         onSuccess: () => {
-          setPendingPartId(null);
-          setSuccessPartName(part.nome);
+          setCart([]);
+          setCartVisible(false);
+          setSuccessMessage(`${totalItems} peça(s) solicitada(s) com sucesso.`);
           setSuccessModalVisible(true);
         },
         onError: () => {
-          setPendingPartId(null);
+          Alert.alert('Erro', 'Não foi possível criar a solicitação. Tente novamente.');
         },
       }
     );
@@ -223,67 +258,82 @@ export default function PartsScreen() {
     return cat ? cat.label : categoria;
   };
 
-  const renderPart = ({ item }: any) => (
-    <View style={styles.partCard}>
-      {item.imageUrl ? (
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.partImage}
-          contentFit="cover"
-          placeholder={require('@/assets/images/icon.png')}
-        />
-      ) : (
-        <View style={styles.partImagePlaceholder}>
-          <ImageIcon size={28} color={Colors.textSecondary} />
-        </View>
-      )}
-      <View style={styles.partInfo}>
-        <Text style={styles.partName}>{item.nome}</Text>
-        <Text style={styles.partSku}>SKU: {item.sku}</Text>
-        <Text style={styles.partCategory}>{getCategoryLabel(item.categoria)}</Text>
-        <View style={styles.partMeta}>
-          <Text style={styles.partPrice}>
-            R$ {item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </Text>
-          <Text style={styles.partStock}>Estoque: {item.estoque}</Text>
-        </View>
-      </View>
+  const renderPart = ({ item }: any) => {
+    const cartItem = cart.find(c => c.part.id === item.id);
 
-      <View style={styles.actions}>
-        {canEdit ? (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleOpenModal(item)}
-            >
-              <Edit2 size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => handleDelete(item.id)}
-            >
-              <Trash2 size={18} color="#fff" />
-            </TouchableOpacity>
-          </>
-        ) : !canViewOnly ? (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.requestButton, !!pendingPartId && styles.submitButtonDisabled]}
-            onPress={() => handleRequestPart(item)}
-            disabled={!!pendingPartId}
-          >
-            {pendingPartId === item.id ? (
-              <ActivityIndicator size="small" color="#fff" />
+    return (
+      <View style={styles.partCard}>
+        {item.imageUrl ? (
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.partImage}
+            contentFit="cover"
+            placeholder={require('@/assets/images/icon.png')}
+          />
+        ) : (
+          <View style={styles.partImagePlaceholder}>
+            <ImageIcon size={28} color={Colors.textSecondary} />
+          </View>
+        )}
+        <View style={styles.partInfo}>
+          <Text style={styles.partName}>{item.nome}</Text>
+          <Text style={styles.partSku}>SKU: {item.sku}</Text>
+          <Text style={styles.partCategory}>{getCategoryLabel(item.categoria)}</Text>
+          <View style={styles.partMeta}>
+            <Text style={styles.partPrice}>
+              R$ {item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </Text>
+            <Text style={styles.partStock}>Estoque: {item.estoque}</Text>
+          </View>
+        </View>
+
+        <View style={styles.actions}>
+          {canEdit ? (
+            <>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.editButton]}
+                onPress={() => handleOpenModal(item)}
+              >
+                <Edit2 size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={() => handleDelete(item.id)}
+              >
+                <Trash2 size={18} color="#fff" />
+              </TouchableOpacity>
+            </>
+          ) : !canViewOnly ? (
+            cartItem ? (
+              <View style={styles.quantityControl}>
+                <TouchableOpacity
+                  style={styles.qtyBtn}
+                  onPress={() => updateQuantity(item.id, cartItem.quantity - 1)}
+                >
+                  <Minus size={14} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.qtyText}>{cartItem.quantity}</Text>
+                <TouchableOpacity
+                  style={styles.qtyBtn}
+                  onPress={() => updateQuantity(item.id, cartItem.quantity + 1)}
+                >
+                  <Plus size={14} color="#fff" />
+                </TouchableOpacity>
+              </View>
             ) : (
-              <>
-                <Package size={18} color="#fff" />
-                <Text style={styles.requestButtonText}>Solicitar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ) : null}
+              <TouchableOpacity
+                style={[styles.actionButton, styles.requestButton]}
+                onPress={() => addToCart(item)}
+              >
+                <ShoppingCart size={16} color="#fff" />
+                <Text style={styles.requestButtonText}>Adicionar</Text>
+              </TouchableOpacity>
+            )
+          ) : null}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   if (isLoading) {
     return (
@@ -361,14 +411,120 @@ export default function PartsScreen() {
         data={filteredParts}
         keyExtractor={(item) => item.id}
         renderItem={renderPart}
-        extraData={pendingPartId}
-        contentContainerStyle={styles.listContainer}
+        extraData={cart}
+        contentContainerStyle={[
+          styles.listContainer,
+          !canEdit && !canViewOnly && cartTotalItems > 0 && { paddingBottom: 100 },
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Nenhuma peça encontrada</Text>
           </View>
         }
       />
+
+      {!canEdit && !canViewOnly && cartTotalItems > 0 && (
+        <TouchableOpacity
+          style={styles.cartFab}
+          onPress={() => setCartVisible(true)}
+          activeOpacity={0.9}
+        >
+          <View style={styles.cartFabLeft}>
+            <View style={styles.cartFabBadge}>
+              <Text style={styles.cartFabBadgeText}>{cartTotalItems}</Text>
+            </View>
+            <ShoppingCart size={20} color="#fff" />
+          </View>
+          <Text style={styles.cartFabText}>Ver Carrinho</Text>
+          <ChevronRight size={18} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
+      )}
+
+      <Modal
+        visible={cartVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setCartVisible(false)}
+      >
+        <View style={styles.cartModalContainer}>
+          <View style={styles.cartModalHeader}>
+            <View>
+              <Text style={styles.cartModalTitle}>Carrinho</Text>
+              <Text style={styles.cartModalSubtitle}>{cartTotalItems} item(s) selecionado(s)</Text>
+            </View>
+            <TouchableOpacity onPress={() => setCartVisible(false)} style={styles.cartModalCloseBtn}>
+              <X size={22} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.cartList} contentContainerStyle={{ paddingBottom: 24 }}>
+            {cart.map((item) => (
+              <View key={item.part.id} style={styles.cartItem}>
+                {item.part.imageUrl ? (
+                  <Image
+                    source={{ uri: item.part.imageUrl }}
+                    style={styles.cartItemImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={styles.cartItemImagePlaceholder}>
+                    <Package size={20} color={Colors.textSecondary} />
+                  </View>
+                )}
+                <View style={styles.cartItemInfo}>
+                  <Text style={styles.cartItemName}>{item.part.nome}</Text>
+                  <Text style={styles.cartItemSku}>SKU: {item.part.sku}</Text>
+                  <Text style={styles.cartItemPrice}>
+                    R$ {(item.part.preco * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+                <View style={styles.cartItemQtyRow}>
+                  <TouchableOpacity
+                    style={styles.cartQtyBtn}
+                    onPress={() => updateQuantity(item.part.id, item.quantity - 1)}
+                  >
+                    <Minus size={14} color={Colors.text} />
+                  </TouchableOpacity>
+                  <Text style={styles.cartQtyText}>{item.quantity}</Text>
+                  <TouchableOpacity
+                    style={styles.cartQtyBtn}
+                    onPress={() => updateQuantity(item.part.id, item.quantity + 1)}
+                  >
+                    <Plus size={14} color={Colors.text} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.cartItemRemoveBtn}
+                  onPress={() => removeFromCart(item.part.id)}
+                >
+                  <Trash2 size={16} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.cartFooter}>
+            <View style={styles.cartTotalRow}>
+              <Text style={styles.cartTotalLabel}>Total estimado</Text>
+              <Text style={styles.cartTotalValue}>
+                R$ {cart.reduce((sum, i) => sum + i.part.preco * i.quantity, 0)
+                  .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.cartSubmitBtn, createTicketMutation.isPending && styles.submitButtonDisabled]}
+              onPress={handleSubmitCart}
+              disabled={createTicketMutation.isPending}
+            >
+              {createTicketMutation.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.cartSubmitBtnText}>Enviar Pedido</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={successModalVisible}
@@ -381,10 +537,9 @@ export default function PartsScreen() {
             <View style={styles.successIconWrap}>
               <CheckCircle size={48} color="#34C759" />
             </View>
-            <Text style={styles.successTitle}>Peça Solicitada!</Text>
+            <Text style={styles.successTitle}>Pedido Enviado!</Text>
             <Text style={styles.successSubtitle}>
-              <Text style={styles.successPartName}>{successPartName}</Text>
-              {' '}foi solicitada com sucesso.{'\n'}Em breve um de nossos atendentes dará continuidade ao seu atendimento.
+              {successMessage}{'\n'}Em breve um de nossos atendentes dará continuidade ao seu atendimento.
             </Text>
             <TouchableOpacity
               style={styles.successButton}
@@ -682,6 +837,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600' as const,
   },
+  quantityControl: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    overflow: 'hidden' as const,
+  },
+  qtyBtn: {
+    padding: 10,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  qtyText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700' as const,
+    minWidth: 24,
+    textAlign: 'center' as const,
+  },
+  cartFab: {
+    position: 'absolute' as const,
+    bottom: 20,
+    left: 16,
+    right: 16,
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  cartFabLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    marginRight: 12,
+  },
+  cartFabBadge: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 6,
+  },
+  cartFabBadgeText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '700' as const,
+  },
+  cartFabText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700' as const,
+    flex: 1,
+  },
   emptyContainer: {
     padding: 32,
     alignItems: 'center' as const,
@@ -689,6 +906,135 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: Colors.textSecondary,
+  },
+  cartModalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  cartModalHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.cardBackground,
+  },
+  cartModalTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  cartModalSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  cartModalCloseBtn: {
+    padding: 4,
+  },
+  cartList: {
+    flex: 1,
+    padding: 16,
+  },
+  cartItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cartItemImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+  },
+  cartItemImagePlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  cartItemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  cartItemName: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.text,
+  },
+  cartItemSku: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  cartItemPrice: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: Colors.primary,
+    marginTop: 2,
+  },
+  cartItemQtyRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden' as const,
+  },
+  cartQtyBtn: {
+    padding: 8,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  cartQtyText: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: Colors.text,
+    minWidth: 24,
+    textAlign: 'center' as const,
+  },
+  cartItemRemoveBtn: {
+    padding: 8,
+  },
+  cartFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.cardBackground,
+    gap: 12,
+  },
+  cartTotalRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  cartTotalLabel: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+  },
+  cartTotalValue: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  cartSubmitBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center' as const,
+  },
+  cartSubmitBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700' as const,
   },
   modalContainer: {
     flex: 1,
@@ -832,10 +1178,6 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     lineHeight: 22,
     marginBottom: 28,
-  },
-  successPartName: {
-    color: '#FFFFFF',
-    fontWeight: '600' as const,
   },
   successButton: {
     backgroundColor: '#34C759',

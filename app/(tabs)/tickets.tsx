@@ -485,6 +485,7 @@ function ChamadosTab() {
     {
       enabled: !!user?.id && canSeeQueue,
       refetchInterval: 15000,
+      placeholderData: (prev: any) => prev,
     }
   );
 
@@ -493,6 +494,7 @@ function ChamadosTab() {
     {
       enabled: !!user?.id && canSeeQueue,
       refetchInterval: 15000,
+      placeholderData: (prev: any) => prev,
     }
   );
 
@@ -501,6 +503,7 @@ function ChamadosTab() {
     {
       enabled: !!user?.id && canSeeQueue,
       refetchInterval: 30000,
+      placeholderData: (prev: any) => prev,
     }
   );
 
