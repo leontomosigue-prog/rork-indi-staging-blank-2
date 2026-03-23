@@ -34,7 +34,6 @@ import {
   Truck,
   Inbox,
   CheckSquare,
-  Building2,
   MessageSquare,
   Scissors,
   Square,
@@ -164,11 +163,13 @@ function TicketCard({
   onTake,
   isTaking,
   showArea = false,
+  onPress,
 }: {
   ticket: any;
   onTake?: () => void;
   isTaking?: boolean;
   showArea?: boolean;
+  onPress?: () => void;
 }) {
   const TypeIcon = TYPE_ICONS[ticket.type] ?? ClipboardList;
   const priority = ticket.priority ? PRIORITY_CONFIG[ticket.priority] : null;
@@ -176,7 +177,7 @@ function TicketCard({
   const statusColor = TICKET_STATUS_COLORS[ticket.status] ?? 'rgba(255,255,255,0.3)';
 
   return (
-    <View style={cardStyles.card}>
+    <Pressable style={cardStyles.card} onPress={onPress} disabled={!onPress}>
       <View style={[cardStyles.areaStrip, { backgroundColor: areaColor }]} />
 
       <View style={cardStyles.body}>
@@ -247,7 +248,7 @@ function TicketCard({
           </View>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -476,6 +477,8 @@ function ChamadosTab() {
   const [partsVisible, setPartsVisible] = useState(false);
   const [checkedParts, setCheckedParts] = useState<Record<string, boolean>>({});
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [manageTicket, setManageTicket] = useState<any>(null);
+  const [manageVisible, setManageVisible] = useState(false);
 
   const availableQuery = trpc.tickets.listAvailable.useQuery(
     { userId: user?.id ?? '', area: employeeArea ?? undefined },
@@ -501,6 +504,18 @@ function ChamadosTab() {
   );
 
   const utils = trpc.useUtils();
+
+  const updateStatusMutation = trpc.tickets.updateStatus.useMutation({
+    onSuccess: () => {
+      void utils.tickets.listAssignedToMe.invalidate();
+      void utils.tickets.listAvailable.invalidate();
+      setManageVisible(false);
+      setManageTicket(null);
+    },
+    onError: (err) => {
+      Alert.alert('Erro', err.message);
+    },
+  });
 
   const takeMutation = trpc.tickets.take.useMutation({
     onSuccess: () => {
@@ -535,6 +550,46 @@ function ChamadosTab() {
       Alert.alert('Erro', err.message || 'Não foi possível iniciar o chat');
     },
   });
+
+  const handleManageTicket = (ticket: any) => {
+    setManageTicket(ticket);
+    setManageVisible(true);
+  };
+
+  const handleResolveTicket = () => {
+    if (!user?.id || !manageTicket) return;
+    Alert.alert('Resolver Chamado', 'Confirmar resolução deste pedido?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Resolver',
+        onPress: () => {
+          updateStatusMutation.mutate({
+            userId: user.id,
+            ticketId: manageTicket.id,
+            status: 'resolvido',
+          });
+        },
+      },
+    ]);
+  };
+
+  const handleArchiveTicket = () => {
+    if (!user?.id || !manageTicket) return;
+    Alert.alert('Excluir Chamado', 'Tem certeza que deseja excluir este chamado?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: () => {
+          updateStatusMutation.mutate({
+            userId: user.id,
+            ticketId: manageTicket.id,
+            status: 'arquivado',
+          });
+        },
+      },
+    ]);
+  };
 
   const handleTakeTicket = (ticket: any) => {
     if (!user?.id) return;
@@ -648,6 +703,7 @@ function ChamadosTab() {
                   key={ticket.id}
                   ticket={ticket}
                   showArea={isAdminUser}
+                  onPress={() => handleManageTicket(ticket)}
                 />
               ))
             )}
@@ -879,6 +935,153 @@ function ChamadosTab() {
             <CheckCircle size={16} color="#FFFFFF" />
             <Text style={partsModalStyles.concludeBtnText}>Concluir</Text>
           </Pressable>
+        </View>
+      </View>
+    </Modal>
+    {/* Manage Assigned Ticket Modal */}
+    <Modal
+      visible={manageVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setManageVisible(false)}
+    >
+      <View style={detailModalStyles.overlay}>
+        <View style={detailModalStyles.sheet}>
+          <View style={detailModalStyles.handle} />
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={detailModalStyles.header}>
+              <View style={detailModalStyles.headerLeft}>
+                <View style={detailModalStyles.typeIconBox}>
+                  {(() => {
+                    const Icon = TYPE_ICONS[manageTicket?.type] ?? ClipboardList;
+                    const areaColor = AREA_COLORS[manageTicket?.area] ?? '#34C759';
+                    return <Icon size={20} color={areaColor} />;
+                  })()}
+                </View>
+                <View>
+                  <Text style={detailModalStyles.headerTitle}>
+                    {TYPE_LABELS[manageTicket?.type] ?? manageTicket?.type ?? 'Chamado'}
+                  </Text>
+                  <Text style={detailModalStyles.headerSub}>Em atendimento por você</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setManageVisible(false)} style={detailModalStyles.closeBtn}>
+                <Text style={detailModalStyles.closeBtnText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={detailModalStyles.section}>
+              <View style={detailModalStyles.sectionHeader}>
+                <User size={14} color="rgba(255,255,255,0.4)" />
+                <Text style={detailModalStyles.sectionTitle}>Dados do Cliente</Text>
+              </View>
+              <View style={detailModalStyles.infoCard}>
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Nome</Text>
+                  <Text style={detailModalStyles.infoValue}>{manageTicket?.customerName ?? '—'}</Text>
+                </View>
+                {manageTicket?.customerEmail && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>E-mail</Text>
+                    <Text style={detailModalStyles.infoValue}>{manageTicket.customerEmail}</Text>
+                  </View>
+                )}
+                {manageTicket?.customerCpf && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>CPF</Text>
+                    <Text style={detailModalStyles.infoValue}>{manageTicket.customerCpf}</Text>
+                  </View>
+                )}
+                {manageTicket?.customerCompanyName && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>Empresa</Text>
+                    <Text style={detailModalStyles.infoValue}>{manageTicket.customerCompanyName}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={detailModalStyles.section}>
+              <View style={detailModalStyles.sectionHeader}>
+                <ClipboardList size={14} color="rgba(255,255,255,0.4)" />
+                <Text style={detailModalStyles.sectionTitle}>Detalhes do Pedido</Text>
+              </View>
+              <View style={detailModalStyles.infoCard}>
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Tipo</Text>
+                  <Text style={detailModalStyles.infoValue}>{TYPE_LABELS[manageTicket?.type] ?? '—'}</Text>
+                </View>
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Área</Text>
+                  <Text style={detailModalStyles.infoValue}>{AREA_LABELS[manageTicket?.area] ?? '—'}</Text>
+                </View>
+                {manageTicket?.priority && (
+                  <View style={detailModalStyles.infoRow}>
+                    <Text style={detailModalStyles.infoLabel}>Prioridade</Text>
+                    <Text style={[detailModalStyles.infoValue, { color: PRIORITY_CONFIG[manageTicket.priority]?.color ?? '#fff' }]}>
+                      {PRIORITY_CONFIG[manageTicket.priority]?.label ?? manageTicket.priority}
+                    </Text>
+                  </View>
+                )}
+                <View style={detailModalStyles.infoRow}>
+                  <Text style={detailModalStyles.infoLabel}>Data</Text>
+                  <Text style={detailModalStyles.infoValue}>{formatDate(manageTicket?.createdAt)}</Text>
+                </View>
+                {manageTicket?.payload?.description && (
+                  <View style={[detailModalStyles.infoRow, { flexDirection: 'column', gap: 6 }]}>
+                    <Text style={detailModalStyles.infoLabel}>Descrição</Text>
+                    <Text style={[detailModalStyles.infoValue, { lineHeight: 20 }]}>
+                      {manageTicket.payload.description}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {manageTicket?.payload?.parts?.length > 0 && (
+              <View style={detailModalStyles.section}>
+                <View style={detailModalStyles.sectionHeader}>
+                  <Package size={14} color="rgba(255,255,255,0.4)" />
+                  <Text style={detailModalStyles.sectionTitle}>Peças Solicitadas</Text>
+                </View>
+                <View style={detailModalStyles.infoCard}>
+                  {manageTicket.payload.parts.map((part: any, i: number) => (
+                    <View key={part.id ?? `p-${i}`} style={detailModalStyles.infoRow}>
+                      <Text style={detailModalStyles.infoLabel}>{part.nome ?? part.name ?? '—'}</Text>
+                      <Text style={detailModalStyles.infoValue}>SKU: {part.sku ?? '—'}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <View style={manageModalStyles.actions}>
+              <Pressable
+                style={[manageModalStyles.resolveBtn, updateStatusMutation.isPending && manageModalStyles.btnDisabled]}
+                onPress={handleResolveTicket}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <CheckCircle size={16} color="#FFFFFF" />
+                    <Text style={manageModalStyles.resolveBtnText}>Marcar como Resolvido</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={[manageModalStyles.archiveBtn, updateStatusMutation.isPending && manageModalStyles.btnDisabled]}
+                onPress={handleArchiveTicket}
+                disabled={updateStatusMutation.isPending}
+              >
+                <XCircle size={16} color="#FF3B30" />
+                <Text style={manageModalStyles.archiveBtnText}>Excluir Chamado</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -1969,5 +2172,47 @@ const partsModalStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',
+  },
+});
+
+const manageModalStyles = StyleSheet.create({
+  actions: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    paddingTop: 8,
+    gap: 10,
+  },
+  resolveBtn: {
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 15,
+  },
+  resolveBtnText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  archiveBtn: {
+    backgroundColor: 'rgba(255,59,48,0.1)',
+    borderRadius: 14,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.25)',
+  },
+  archiveBtnText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#FF3B30',
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
 });
