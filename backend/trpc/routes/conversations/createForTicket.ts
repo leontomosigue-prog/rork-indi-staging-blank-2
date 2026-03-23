@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { read, write } from "@/backend/data/store";
+import { read, readFresh, write } from "@/backend/data/store";
 import { Conversation, Ticket, User } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
@@ -20,18 +20,26 @@ export default publicProcedure
       throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
     }
 
-    const tickets = await read<Ticket[]>("tickets", []);
-    const ticket = tickets.find(t => t.id === input.ticketId);
+    let tickets = await read<Ticket[]>("tickets", []);
+    let ticket = tickets.find(t => t.id === input.ticketId);
 
     if (!ticket) {
+      console.log(`⚠️ Ticket ${input.ticketId} not found in memory, forcing fresh read from DB...`);
+      tickets = await readFresh<Ticket[]>("tickets", []);
+      ticket = tickets.find(t => t.id === input.ticketId);
+    }
+
+    if (!ticket) {
+      console.error(`❌ Ticket ${input.ticketId} not found even after DB reload. Total tickets: ${tickets.length}. IDs: ${tickets.map(t => t.id).join(', ')}`);
       throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
     }
 
-    const conversations = await read<Conversation[]>("conversations", []);
+    let conversations = await read<Conversation[]>("conversations", []);
 
     const existingConversation = conversations.find(c => c.ticketId === input.ticketId);
 
     if (existingConversation) {
+      console.log(`✅ Returning existing conversation ${existingConversation.id} for ticket ${input.ticketId}`);
       return existingConversation;
     }
 
@@ -55,6 +63,8 @@ export default publicProcedure
 
     conversations.push(newConversation);
     await write("conversations", conversations);
+
+    console.log(`✅ Created conversation ${newConversation.id} for ticket ${input.ticketId}`);
 
     return newConversation;
   });

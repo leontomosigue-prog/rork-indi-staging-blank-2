@@ -101,6 +101,16 @@ async function loadFromDb(name: string): Promise<any[] | null> {
   }
 }
 
+export function invalidateCache(name: string): void {
+  memoryStore.delete(name);
+  console.log(`🗑️ Cache invalidated for [${name}]`);
+}
+
+export async function readFresh<T>(name: string, fallback: T): Promise<T> {
+  invalidateCache(name);
+  return read(name, fallback);
+}
+
 export async function read<T>(name: string, fallback: T): Promise<T> {
   // Memory is always the source of truth during a session.
   // DB is only used for initial load when memory is empty (e.g. after server restart).

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { read, write } from "@/backend/data/store";
+import { read, readFresh, write } from "@/backend/data/store";
 import { Ticket } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 
@@ -12,10 +12,17 @@ export default publicProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const tickets = await read<Ticket[]>("tickets", []);
-    const ticketIndex = tickets.findIndex(t => t.id === input.ticketId);
+    let tickets = await read<Ticket[]>("tickets", []);
+    let ticketIndex = tickets.findIndex(t => t.id === input.ticketId);
 
     if (ticketIndex === -1) {
+      console.log(`⚠️ Ticket ${input.ticketId} not found in memory, forcing fresh read from DB...`);
+      tickets = await readFresh<Ticket[]>("tickets", []);
+      ticketIndex = tickets.findIndex(t => t.id === input.ticketId);
+    }
+
+    if (ticketIndex === -1) {
+      console.error(`❌ Ticket ${input.ticketId} not found even after DB reload. Total tickets: ${tickets.length}. IDs: ${tickets.map(t => t.id).join(', ')}`);
       throw new TRPCError({ code: "NOT_FOUND", message: "Pedido não encontrado" });
     }
 
