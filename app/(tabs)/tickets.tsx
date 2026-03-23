@@ -843,7 +843,7 @@ function ChamadosTab() {
         <View style={detailModalStyles.sheet}>
           <View style={detailModalStyles.handle} />
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
             <View style={detailModalStyles.header}>
               <View style={detailModalStyles.headerLeft}>
                 <View style={detailModalStyles.typeIconBox}>

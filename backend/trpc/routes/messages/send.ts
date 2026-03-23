@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { read, write } from "@/backend/data/store";
+import { read, readFresh, write } from "@/backend/data/store";
 import { Message, Conversation, User } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
@@ -22,11 +22,18 @@ export default publicProcedure
       throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
     }
 
-    const conversations = await read<Conversation[]>("conversations", []);
-    const conversationIndex = conversations.findIndex(c => c.id === input.conversationId);
+    let conversations = await read<Conversation[]>("conversations", []);
+    let conversationIndex = conversations.findIndex(c => c.id === input.conversationId);
 
     if (conversationIndex === -1) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      console.log(`⚠️ Conversation ${input.conversationId} not found in memory, forcing fresh read from DB...`);
+      conversations = await readFresh<Conversation[]>("conversations", []);
+      conversationIndex = conversations.findIndex(c => c.id === input.conversationId);
+    }
+
+    if (conversationIndex === -1) {
+      console.error(`❌ Conversation ${input.conversationId} not found even after DB reload. Total: ${conversations.length}`);
+      throw new TRPCError({ code: "NOT_FOUND", message: "Conversa não encontrada. Tente abrir o chat novamente." });
     }
 
     const conversation = conversations[conversationIndex];
