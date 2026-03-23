@@ -135,10 +135,12 @@ export async function write<T>(name: string, data: T): Promise<void> {
     return;
   }
 
-  // Sync to DB asynchronously; failures don't affect in-session correctness
-  syncToDb(name, data).catch(error => {
+  // Sync to DB synchronously so data is persisted before returning
+  try {
+    await syncToDb(name, data);
+  } catch (error) {
     console.warn(`⚠️ DB sync failed for ${name}, data is safe in memory:`, error);
-  });
+  }
 }
 
 async function syncToDb<T>(name: string, data: T): Promise<void> {
