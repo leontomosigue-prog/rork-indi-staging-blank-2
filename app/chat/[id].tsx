@@ -10,12 +10,186 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Send, ArrowLeft } from 'lucide-react-native';
+import {
+  Send,
+  ArrowLeft,
+  User,
+  Mail,
+  CreditCard,
+  Building2,
+  ChevronDown,
+  Package,
+  Truck,
+  Wrench,
+  ShoppingCart,
+  ClipboardList,
+  Calendar,
+} from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
+
+const TYPE_LABELS: Record<string, string> = {
+  sales_quote: 'Orçamento de Venda',
+  rental_request: 'Pedido de Locação',
+  service: 'Assistência Técnica',
+  parts_request: 'Pedido de Peças',
+};
+
+const TYPE_ICONS: Record<string, typeof Package> = {
+  sales_quote: ShoppingCart,
+  rental_request: Truck,
+  service: Wrench,
+  parts_request: Package,
+};
+
+const AREA_COLORS: Record<string, string> = {
+  vendas: '#007AFF',
+  locacao: '#5856D6',
+  assistencia: '#FF9500',
+  pecas: '#34C759',
+};
+
+function formatDate(date: Date | string) {
+  return new Date(date).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function ClientInfoCard({ ticket }: { ticket: any }) {
+  const [expanded, setExpanded] = useState(false);
+  const animValue = useRef(new Animated.Value(0)).current;
+
+  const toggle = () => {
+    const toValue = expanded ? 0 : 1;
+    Animated.spring(animValue, {
+      toValue,
+      useNativeDriver: false,
+      tension: 80,
+      friction: 12,
+    }).start();
+    setExpanded(!expanded);
+  };
+
+  const areaColor = AREA_COLORS[ticket?.area] ?? '#34C759';
+  const TypeIcon = TYPE_ICONS[ticket?.type] ?? ClipboardList;
+
+  const maxHeight = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 400],
+  });
+
+  const rotate = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  return (
+    <View style={clientStyles.card}>
+      <Pressable style={clientStyles.header} onPress={toggle}>
+        <View style={clientStyles.headerLeft}>
+          <View style={[clientStyles.iconBox, { backgroundColor: `${areaColor}22` }]}>
+            <TypeIcon size={14} color={areaColor} />
+          </View>
+          <View>
+            <Text style={clientStyles.ticketType}>
+              {TYPE_LABELS[ticket?.type] ?? ticket?.type ?? 'Pedido'}
+            </Text>
+            <Text style={clientStyles.customerNameSmall}>
+              {ticket?.customerName ?? 'Cliente'}
+            </Text>
+          </View>
+        </View>
+        <Animated.View style={{ transform: [{ rotate }] }}>
+          <ChevronDown size={16} color="rgba(255,255,255,0.4)" />
+        </Animated.View>
+      </Pressable>
+
+      <Animated.View style={[clientStyles.details, { maxHeight, overflow: 'hidden' }]}>
+        <View style={clientStyles.divider} />
+
+        <View style={clientStyles.section}>
+          <Text style={clientStyles.sectionLabel}>CLIENTE</Text>
+          <View style={clientStyles.rows}>
+            <View style={clientStyles.row}>
+              <User size={13} color="rgba(255,255,255,0.35)" />
+              <Text style={clientStyles.rowValue}>{ticket?.customerName ?? '—'}</Text>
+            </View>
+            {ticket?.customerEmail && (
+              <View style={clientStyles.row}>
+                <Mail size={13} color="rgba(255,255,255,0.35)" />
+                <Text style={clientStyles.rowValue}>{ticket.customerEmail}</Text>
+              </View>
+            )}
+            {ticket?.customerCpf && (
+              <View style={clientStyles.row}>
+                <CreditCard size={13} color="rgba(255,255,255,0.35)" />
+                <Text style={clientStyles.rowValue}>CPF: {ticket.customerCpf}</Text>
+              </View>
+            )}
+            {ticket?.customerCompanyName && (
+              <View style={clientStyles.row}>
+                <Building2 size={13} color="rgba(255,255,255,0.35)" />
+                <Text style={clientStyles.rowValue}>{ticket.customerCompanyName}</Text>
+              </View>
+            )}
+            {ticket?.customerCnpj && (
+              <View style={clientStyles.row}>
+                <CreditCard size={13} color="rgba(255,255,255,0.35)" />
+                <Text style={clientStyles.rowValue}>CNPJ: {ticket.customerCnpj}</Text>
+              </View>
+            )}
+            {ticket?.customerBirthDate && (
+              <View style={clientStyles.row}>
+                <Calendar size={13} color="rgba(255,255,255,0.35)" />
+                <Text style={clientStyles.rowValue}>Nasc.: {ticket.customerBirthDate}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {ticket?.payload?.description && (
+          <View style={clientStyles.section}>
+            <Text style={clientStyles.sectionLabel}>DESCRIÇÃO</Text>
+            <Text style={clientStyles.descriptionText}>{ticket.payload.description}</Text>
+          </View>
+        )}
+
+        {ticket?.payload?.parts?.length > 0 && (
+          <View style={clientStyles.section}>
+            <Text style={clientStyles.sectionLabel}>PEÇAS SOLICITADAS</Text>
+            {ticket.payload.parts.map((part: any, i: number) => (
+              <View key={part.id ?? `p-${i}`} style={clientStyles.partRow}>
+                <View style={[clientStyles.partDot, { backgroundColor: areaColor }]} />
+                <Text style={clientStyles.partName}>{part.nome ?? part.name ?? '—'}</Text>
+                {part.preco != null && (
+                  <Text style={clientStyles.partPrice}>
+                    R$ {Number(part.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={clientStyles.section}>
+          <View style={clientStyles.row}>
+            <Calendar size={13} color="rgba(255,255,255,0.35)" />
+            <Text style={clientStyles.rowValueSmall}>{formatDate(ticket?.createdAt)}</Text>
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,6 +201,9 @@ export default function ChatScreen() {
 
   const conversationId = id ?? '';
 
+  const lastKnownConversationRef = useRef<any>(null);
+  const lastKnownTicketIdRef = useRef<string | null>(null);
+
   const employeesQuery = trpc.users.listEmployees.useQuery(undefined, {
     enabled: !!user?.id,
   });
@@ -36,6 +213,27 @@ export default function ChatScreen() {
     {
       enabled: !!user?.id && !!conversationId,
       refetchInterval: 8000,
+      placeholderData: (prev: any) => prev,
+    }
+  );
+
+  const conversation = useMemo(() => {
+    if (!conversationsQuery.data) return lastKnownConversationRef.current;
+    const found = conversationsQuery.data.find((c: any) => c.id === conversationId) ?? null;
+    if (found) {
+      lastKnownConversationRef.current = found;
+      lastKnownTicketIdRef.current = found.ticketId;
+    }
+    return found ?? lastKnownConversationRef.current;
+  }, [conversationsQuery.data, conversationId]);
+
+  const ticketId = conversation?.ticketId ?? lastKnownTicketIdRef.current ?? '';
+
+  const ticketQuery = trpc.tickets.getById.useQuery(
+    { userId: user?.id ?? '', ticketId },
+    {
+      enabled: !!user?.id && !!ticketId,
+      placeholderData: (prev: any) => prev,
     }
   );
 
@@ -44,6 +242,7 @@ export default function ChatScreen() {
     {
       enabled: !!user?.id && !!conversationId,
       refetchInterval: 5000,
+      placeholderData: (prev: any) => prev,
     }
   );
 
@@ -61,11 +260,6 @@ export default function ChatScreen() {
       Alert.alert('Erro', err.message || 'Não foi possível enviar a mensagem');
     },
   });
-
-  const conversation = useMemo(() => {
-    if (!conversationsQuery.data) return null;
-    return conversationsQuery.data.find((c: any) => c.id === conversationId) ?? null;
-  }, [conversationsQuery.data, conversationId]);
 
   const messages: any[] = messagesQuery.data ?? [];
 
@@ -145,7 +339,7 @@ export default function ChatScreen() {
   };
 
   const isLoadingConversation =
-    conversationsQuery.isLoading && !conversationsQuery.data;
+    conversationsQuery.isLoading && !conversationsQuery.data && !lastKnownConversationRef.current;
 
   if (!user?.id) {
     return (
@@ -190,6 +384,9 @@ export default function ChatScreen() {
     );
   }
 
+  const ticket = ticketQuery.data;
+  const customerName = ticket?.customerName ?? 'Chat';
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -198,7 +395,7 @@ export default function ChatScreen() {
     >
       <Stack.Screen
         options={{
-          title: 'Chat',
+          title: customerName,
           headerBackTitle: 'Voltar',
         }}
       />
@@ -212,6 +409,13 @@ export default function ChatScreen() {
         onContentSizeChange={() => {
           flatListRef.current?.scrollToEnd({ animated: false });
         }}
+        ListHeaderComponent={
+          ticket ? (
+            <View style={styles.clientCardWrapper}>
+              <ClientInfoCard ticket={ticket} />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           messagesQuery.isLoading ? (
             <View style={styles.emptyContainer}>
@@ -261,16 +465,116 @@ export default function ChatScreen() {
   );
 }
 
+const clientStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#2E2E2E',
+    overflow: 'hidden' as const,
+  },
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    padding: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    flex: 1,
+  },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  ticketType: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  customerNameSmall: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#2E2E2E',
+    marginHorizontal: 12,
+  },
+  details: {},
+  section: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: 'rgba(255,255,255,0.25)',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase' as const,
+    marginBottom: 8,
+  },
+  rows: {
+    gap: 7,
+  },
+  row: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  rowValue: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    flex: 1,
+  },
+  rowValueSmall: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  descriptionText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    lineHeight: 19,
+  },
+  partRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    marginBottom: 6,
+  },
+  partDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  partName: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.75)',
+    flex: 1,
+  },
+  partPrice: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+  },
+});
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#1A1A1A',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
-    backgroundColor: Colors.background,
+    backgroundColor: '#1A1A1A',
     gap: 16,
     padding: 32,
   },
@@ -304,12 +608,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textLight,
   },
+  clientCardWrapper: {
+    marginBottom: 16,
+  },
   messagesContainer: {
-    padding: 16,
+    padding: 14,
     flexGrow: 1,
   },
   messageContainer: {
-    marginBottom: 12,
+    marginBottom: 10,
     maxWidth: '80%',
   },
   myMessageContainer: {
@@ -326,14 +633,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   otherMessageBubble: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#262626',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#333333',
   },
   senderName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: 'rgba(255,255,255,0.6)',
     marginBottom: 4,
   },
   messageText: {
@@ -345,62 +652,64 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   otherMessageText: {
-    color: Colors.text,
+    color: '#FFFFFF',
   },
   messageTime: {
     fontSize: 11,
   },
   myMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   otherMessageTime: {
-    color: Colors.textLight,
+    color: 'rgba(255,255,255,0.3)',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
-    paddingVertical: 64,
+    paddingVertical: 48,
     gap: 8,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: 'rgba(255,255,255,0.3)',
   },
   emptySubtext: {
-    fontSize: 14,
-    color: Colors.textLight,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.2)',
     textAlign: 'center' as const,
   },
   inputContainer: {
     flexDirection: 'row' as const,
-    padding: 16,
-    backgroundColor: Colors.surface,
+    padding: 12,
+    backgroundColor: '#1E1E1E',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: '#2E2E2E',
     alignItems: 'flex-end' as const,
   },
   input: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#2A2A2A',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: Colors.text,
+    color: '#FFFFFF',
     maxHeight: 100,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: Colors.primary,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
 });

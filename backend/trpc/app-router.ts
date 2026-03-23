@@ -35,6 +35,7 @@ import takeTicket from "./routes/tickets/takeTicket";
 import listAvailableTickets from "./routes/tickets/listAvailable";
 import listAssignedToMeTickets from "./routes/tickets/listAssignedToMe";
 import listResolvedTickets from "./routes/tickets/listResolved";
+import getByIdTicket from "./routes/tickets/getById";
 
 import listMineConversations from "./routes/conversations/listMine";
 import createForTicket from "./routes/conversations/createForTicket";
@@ -91,6 +92,7 @@ export const appRouter = createTRPCRouter({
     listAvailable: listAvailableTickets,
     listAssignedToMe: listAssignedToMeTickets,
     listResolved: listResolvedTickets,
+    getById: getByIdTicket,
   }),
   conversations: createTRPCRouter({
     listMine: listMineConversations,
