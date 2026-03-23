@@ -29,20 +29,24 @@ export default publicProcedure
 
     const ticket = tickets[ticketIndex];
 
-    const roleMap: Record<string, string> = {
-      vendas: "sales",
-      locacao: "rental",
-      assistencia: "technical",
-      pecas: "parts",
-    };
+    const isAssignee = ticket.assigneeId === input.userId;
+    const isAdmin = user.roles.includes("admin");
 
-    const requiredRole = roleMap[ticket.area];
-
-    if (!user.roles.includes(requiredRole as any) && !user.roles.includes("admin")) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "User does not have permission to update this ticket",
-      });
+    if (!isAssignee && !isAdmin) {
+      const roleMap: Record<string, string> = {
+        vendas: "sales",
+        locacao: "rental",
+        assistencia: "technical",
+        pecas: "parts",
+      };
+      const requiredRole = roleMap[ticket.area];
+      const hasRole = requiredRole ? user.roles.includes(requiredRole as any) : false;
+      if (!hasRole) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Sem permissão para atualizar este chamado",
+        });
+      }
     }
 
     tickets[ticketIndex] = {

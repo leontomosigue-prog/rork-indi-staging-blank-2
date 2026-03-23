@@ -480,6 +480,31 @@ function ChamadosTab() {
   const [manageTicket, setManageTicket] = useState<any>(null);
   const [manageVisible, setManageVisible] = useState(false);
 
+  const expandedParts = useMemo(() => {
+    const parts: any[] = detailsTicket?.payload?.parts ?? [];
+    const result: Array<{ part: any; checkKey: string; unitIndex: number; totalQty: number }> = [];
+    parts.forEach((part: any) => {
+      const qty = Math.max(1, Number(part.quantidade ?? 1));
+      for (let i = 0; i < qty; i++) {
+        result.push({
+          part,
+          checkKey: `${part.id ?? part.sku ?? 'part'}-${i}`,
+          unitIndex: i,
+          totalQty: qty,
+        });
+      }
+    });
+    return result;
+  }, [detailsTicket?.payload?.parts]);
+
+  const totalOrderValue = useMemo(() => {
+    const parts: any[] = detailsTicket?.payload?.parts ?? [];
+    return parts.reduce((sum: number, part: any) => {
+      const qty = Math.max(1, Number(part.quantidade ?? 1));
+      return sum + Number(part.preco ?? 0) * qty;
+    }, 0);
+  }, [detailsTicket?.payload?.parts]);
+
   const availableQuery = trpc.tickets.listAvailable.useQuery(
     { userId: user?.id ?? '', area: employeeArea ?? undefined },
     {
@@ -522,6 +547,7 @@ function ChamadosTab() {
     onSuccess: () => {
       void utils.tickets.listAssignedToMe.invalidate();
       void utils.tickets.listAvailable.invalidate();
+      void utils.tickets.listResolved.invalidate();
       setManageVisible(false);
       setManageTicket(null);
     },
@@ -569,7 +595,7 @@ function ChamadosTab() {
     setManageVisible(true);
   };
 
-  const handleResolveTicket = () => {
+  const _handleResolveTicket = () => {
     if (!user?.id || !manageTicket) return;
     Alert.alert('Resolver Chamado', 'Confirmar resolução deste pedido?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -615,6 +641,13 @@ function ChamadosTab() {
     if (!user?.id || !detailsTicket) return;
     setIsCreatingConversation(true);
     createConversationMutation.mutate({ userId: user.id, ticketId: detailsTicket.id });
+  };
+
+  const handleOpenChatFromManage = () => {
+    if (!user?.id || !manageTicket) return;
+    setManageVisible(false);
+    setIsCreatingConversation(true);
+    createConversationMutation.mutate({ userId: user.id, ticketId: manageTicket.id });
   };
 
   const togglePartCheck = (partId: string) => {
@@ -902,6 +935,14 @@ function ChamadosTab() {
                     </Text>
                   </View>
                 )}
+                {detailsTicket?.type === 'parts_request' && totalOrderValue > 0 && (
+                  <View style={[detailModalStyles.infoRow, { marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 10 }]}>
+                    <Text style={[detailModalStyles.infoLabel, { fontWeight: '700' as const }]}>Valor Total</Text>
+                    <Text style={[detailModalStyles.infoValue, { color: '#34C759', fontWeight: '700' as const }]}>
+                      R$ {totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -953,19 +994,18 @@ function ChamadosTab() {
               <Text style={partsModalStyles.headerTitle}>Separação de Peças</Text>
             </View>
             <Text style={partsModalStyles.headerCount}>
-              {Object.values(checkedParts).filter(Boolean).length} / {detailsTicket?.payload?.parts?.length ?? 0}
+              {Object.values(checkedParts).filter(Boolean).length} / {expandedParts.length}
             </Text>
           </View>
 
           <ScrollView style={partsModalStyles.list} contentContainerStyle={{ paddingBottom: 20 }}>
-            {(detailsTicket?.payload?.parts ?? []).map((part: any, index: number) => {
-              const partKey = part.id ?? `part-${index}`;
-              const isChecked = !!checkedParts[partKey];
+            {expandedParts.map(({ part, checkKey, unitIndex, totalQty }) => {
+              const isChecked = !!checkedParts[checkKey];
               return (
                 <Pressable
-                  key={partKey}
+                  key={checkKey}
                   style={[partsModalStyles.partRow, isChecked && partsModalStyles.partRowChecked]}
-                  onPress={() => togglePartCheck(partKey)}
+                  onPress={() => togglePartCheck(checkKey)}
                 >
                   <View style={[partsModalStyles.checkbox, isChecked && partsModalStyles.checkboxChecked]}>
                     {isChecked && <CheckCircle size={16} color="#FFFFFF" />}
@@ -974,6 +1014,9 @@ function ChamadosTab() {
                   <View style={partsModalStyles.partInfo}>
                     <Text style={[partsModalStyles.partName, isChecked && partsModalStyles.partNameChecked]}>
                       {part.nome ?? part.name ?? '—'}
+                      {totalQty > 1 && (
+                        <Text style={partsModalStyles.partUnit}> ({unitIndex + 1}/{totalQty})</Text>
+                      )}
                     </Text>
                     <Text style={partsModalStyles.partSku}>SKU: {part.sku ?? '—'}</Text>
                   </View>
@@ -1108,25 +1151,40 @@ function ChamadosTab() {
                   {manageTicket.payload.parts.map((part: any, i: number) => (
                     <View key={part.id ?? `p-${i}`} style={detailModalStyles.infoRow}>
                       <Text style={detailModalStyles.infoLabel}>{part.nome ?? part.name ?? '—'}</Text>
-                      <Text style={detailModalStyles.infoValue}>SKU: {part.sku ?? '—'}</Text>
+                      <Text style={detailModalStyles.infoValue}>
+                        {Number(part.quantidade ?? 1) > 1 ? `x${part.quantidade} · ` : ''}SKU: {part.sku ?? '—'}
+                      </Text>
                     </View>
                   ))}
+                  {(() => {
+                    const total = (manageTicket.payload.parts as any[]).reduce((sum: number, p: any) => {
+                      return sum + Number(p.preco ?? 0) * Math.max(1, Number(p.quantidade ?? 1));
+                    }, 0);
+                    return total > 0 ? (
+                      <View style={[detailModalStyles.infoRow, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', marginTop: 6, paddingTop: 8 }]}>
+                        <Text style={[detailModalStyles.infoLabel, { fontWeight: '700' as const }]}>Total</Text>
+                        <Text style={[detailModalStyles.infoValue, { color: '#34C759', fontWeight: '700' as const }]}>
+                          R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                    ) : null;
+                  })()}
                 </View>
               </View>
             )}
 
             <View style={manageModalStyles.actions}>
               <Pressable
-                style={[manageModalStyles.resolveBtn, updateStatusMutation.isPending && manageModalStyles.btnDisabled]}
-                onPress={handleResolveTicket}
-                disabled={updateStatusMutation.isPending}
+                style={[manageModalStyles.chatBtn, isCreatingConversation && manageModalStyles.btnDisabled]}
+                onPress={handleOpenChatFromManage}
+                disabled={isCreatingConversation}
               >
-                {updateStatusMutation.isPending ? (
+                {isCreatingConversation ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <CheckCircle size={16} color="#FFFFFF" />
-                    <Text style={manageModalStyles.resolveBtnText}>Marcar como Resolvido</Text>
+                    <MessageSquare size={16} color="#FFFFFF" />
+                    <Text style={manageModalStyles.chatBtnText}>Abrir Chat</Text>
                   </>
                 )}
               </Pressable>
@@ -2254,6 +2312,11 @@ const partsModalStyles = StyleSheet.create({
     color: 'rgba(255,255,255,0.35)',
     marginTop: 2,
   },
+  partUnit: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '400' as const,
+  },
   partPrice: {
     fontSize: 13,
     fontWeight: '600' as const,
@@ -2282,6 +2345,20 @@ const manageModalStyles = StyleSheet.create({
     paddingBottom: 32,
     paddingTop: 8,
     gap: 10,
+  },
+  chatBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 15,
+  },
+  chatBtnText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
   },
   resolveBtn: {
     backgroundColor: '#34C759',

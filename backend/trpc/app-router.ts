@@ -40,6 +40,7 @@ import getByIdTicket from "./routes/tickets/getById";
 import listMineConversations from "./routes/conversations/listMine";
 import createForTicket from "./routes/conversations/createForTicket";
 import archiveForUser from "./routes/conversations/archiveForUser";
+import getByIdConversation from "./routes/conversations/getById";
 
 import listByConversation from "./routes/messages/listByConversation";
 import sendMessage from "./routes/messages/send";
@@ -98,6 +99,7 @@ export const appRouter = createTRPCRouter({
     listMine: listMineConversations,
     createForTicket,
     archiveForUser,
+    getById: getByIdConversation,
   }),
   messages: createTRPCRouter({
     listByConversation,

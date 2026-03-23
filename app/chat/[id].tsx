@@ -28,6 +28,7 @@ import {
   ShoppingCart,
   ClipboardList,
   Calendar,
+  CheckCircle,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
@@ -84,13 +85,21 @@ function ClientInfoCard({ ticket }: { ticket: any }) {
 
   const maxHeight = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 400],
+    outputRange: [0, 500],
   });
 
   const rotate = animValue.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
+
+  const totalValue = useMemo(() => {
+    const parts: any[] = ticket?.payload?.parts ?? [];
+    return parts.reduce((sum: number, part: any) => {
+      const qty = Math.max(1, Number(part.quantidade ?? 1));
+      return sum + Number(part.preco ?? 0) * qty;
+    }, 0);
+  }, [ticket?.payload?.parts]);
 
   return (
     <View style={clientStyles.card}>
@@ -169,14 +178,27 @@ function ClientInfoCard({ ticket }: { ticket: any }) {
             {ticket.payload.parts.map((part: any, i: number) => (
               <View key={part.id ?? `p-${i}`} style={clientStyles.partRow}>
                 <View style={[clientStyles.partDot, { backgroundColor: areaColor }]} />
-                <Text style={clientStyles.partName}>{part.nome ?? part.name ?? '—'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={clientStyles.partName}>{part.nome ?? part.name ?? '—'}</Text>
+                  {Number(part.quantidade ?? 1) > 1 && (
+                    <Text style={clientStyles.partQty}>Qtd: {part.quantidade}</Text>
+                  )}
+                </View>
                 {part.preco != null && (
                   <Text style={clientStyles.partPrice}>
-                    R$ {Number(part.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(Number(part.preco) * Math.max(1, Number(part.quantidade ?? 1))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </Text>
                 )}
               </View>
             ))}
+            {totalValue > 0 && (
+              <View style={clientStyles.totalRow}>
+                <Text style={clientStyles.totalLabel}>Total do Pedido</Text>
+                <Text style={clientStyles.totalValue}>
+                  R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -201,33 +223,22 @@ export default function ChatScreen() {
 
   const conversationId = id ?? '';
 
-  const lastKnownConversationRef = useRef<any>(null);
-  const lastKnownTicketIdRef = useRef<string | null>(null);
-
   const employeesQuery = trpc.users.listEmployees.useQuery(undefined, {
     enabled: !!user?.id,
   });
 
-  const conversationsQuery = trpc.conversations.listMine.useQuery(
-    { userId: user?.id ?? '' },
+  const conversationQuery = trpc.conversations.getById.useQuery(
+    { userId: user?.id ?? '', conversationId },
     {
       enabled: !!user?.id && !!conversationId,
-      refetchInterval: 8000,
+      retry: 3,
+      retryDelay: 1500,
       placeholderData: (prev: any) => prev,
     }
   );
 
-  const conversation = useMemo(() => {
-    if (!conversationsQuery.data) return lastKnownConversationRef.current;
-    const found = conversationsQuery.data.find((c: any) => c.id === conversationId) ?? null;
-    if (found) {
-      lastKnownConversationRef.current = found;
-      lastKnownTicketIdRef.current = found.ticketId;
-    }
-    return found ?? lastKnownConversationRef.current;
-  }, [conversationsQuery.data, conversationId]);
-
-  const ticketId = conversation?.ticketId ?? lastKnownTicketIdRef.current ?? '';
+  const conversation = conversationQuery.data ?? null;
+  const ticketId = conversation?.ticketId ?? '';
 
   const ticketQuery = trpc.tickets.getById.useQuery(
     { userId: user?.id ?? '', ticketId },
@@ -240,7 +251,7 @@ export default function ChatScreen() {
   const messagesQuery = trpc.messages.listByConversation.useQuery(
     { userId: user?.id ?? '', conversationId },
     {
-      enabled: !!user?.id && !!conversationId,
+      enabled: !!user?.id && !!conversationId && !!conversation,
       refetchInterval: 5000,
       placeholderData: (prev: any) => prev,
     }
@@ -258,6 +269,20 @@ export default function ChatScreen() {
     },
     onError: (err) => {
       Alert.alert('Erro', err.message || 'Não foi possível enviar a mensagem');
+    },
+  });
+
+  const resolveTicketMutation = trpc.tickets.updateStatus.useMutation({
+    onSuccess: () => {
+      void utils.tickets.listAssignedToMe.invalidate();
+      void utils.tickets.listResolved.invalidate();
+      void utils.tickets.getById.invalidate({ ticketId });
+      Alert.alert('Chamado resolvido', 'O chamado foi marcado como resolvido com sucesso.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    },
+    onError: (err) => {
+      Alert.alert('Erro', err.message || 'Não foi possível resolver o chamado');
     },
   });
 
@@ -292,6 +317,31 @@ export default function ChatScreen() {
       text: messageText.trim(),
     });
     setMessageText('');
+  };
+
+  const ticket = ticketQuery.data;
+  const isEmployee = (user?.roles?.length ?? 0) > 0;
+  const canResolve = isEmployee && ticket?.status === 'em_andamento';
+
+  const handleResolveTicket = () => {
+    if (!user?.id || !ticketId) return;
+    Alert.alert(
+      'Resolver Chamado',
+      'Confirmar que este chamado foi resolvido?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Resolver',
+          onPress: () => {
+            resolveTicketMutation.mutate({
+              userId: user.id,
+              ticketId,
+              status: 'resolvido',
+            });
+          },
+        },
+      ]
+    );
   };
 
   const renderMessage = ({ item }: { item: any }) => {
@@ -338,8 +388,7 @@ export default function ChatScreen() {
     );
   };
 
-  const isLoadingConversation =
-    conversationsQuery.isLoading && !conversationsQuery.data && !lastKnownConversationRef.current;
+  const isLoadingConversation = conversationQuery.isLoading && !conversationQuery.data;
 
   if (!user?.id) {
     return (
@@ -358,15 +407,18 @@ export default function ChatScreen() {
     );
   }
 
-  if (!conversation && !conversationsQuery.isLoading) {
+  if (!conversation && !conversationQuery.isLoading) {
     return (
       <View style={styles.centerContainer}>
         <Stack.Screen options={{ title: 'Chat' }} />
         <Text style={styles.errorText}>Conversa não encontrada</Text>
+        <Text style={styles.errorSubtext}>
+          A conversa pode ter sido removida ou ainda não foi criada.
+        </Text>
         <TouchableOpacity
           style={styles.retryBtn}
           onPress={() => {
-            void conversationsQuery.refetch();
+            void conversationQuery.refetch();
           }}
           activeOpacity={0.7}
         >
@@ -384,7 +436,6 @@ export default function ChatScreen() {
     );
   }
 
-  const ticket = ticketQuery.data;
   const customerName = ticket?.customerName ?? 'Chat';
 
   return (
@@ -397,6 +448,25 @@ export default function ChatScreen() {
         options={{
           title: customerName,
           headerBackTitle: 'Voltar',
+          headerRight: canResolve
+            ? () => (
+                <TouchableOpacity
+                  onPress={handleResolveTicket}
+                  style={styles.resolveHeaderBtn}
+                  disabled={resolveTicketMutation.isPending}
+                  activeOpacity={0.7}
+                >
+                  {resolveTicketMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#34C759" />
+                  ) : (
+                    <View style={styles.resolveHeaderBtnInner}>
+                      <CheckCircle size={15} color="#34C759" />
+                      <Text style={styles.resolveHeaderBtnText}>Resolvido</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )
+            : undefined,
         }}
       />
 
@@ -545,23 +615,48 @@ const clientStyles = StyleSheet.create({
   },
   partRow: {
     flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    alignItems: 'flex-start' as const,
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   partDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    marginTop: 5,
   },
   partName: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.75)',
-    flex: 1,
+  },
+  partQty: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
   },
   partPrice: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600' as const,
+  },
+  totalRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    marginTop: 8,
+    paddingTop: 10,
+  },
+  totalLabel: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  totalValue: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#34C759',
   },
 });
 
@@ -586,6 +681,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textLight,
     textAlign: 'center' as const,
+    fontWeight: '600' as const,
+  },
+  errorSubtext: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center' as const,
+    lineHeight: 18,
   },
   retryBtn: {
     backgroundColor: Colors.primary,
@@ -607,6 +709,26 @@ const styles = StyleSheet.create({
   backBtnText: {
     fontSize: 14,
     color: Colors.textLight,
+  },
+  resolveHeaderBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  resolveHeaderBtnInner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    backgroundColor: 'rgba(52,199,89,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.3)',
+  },
+  resolveHeaderBtnText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#34C759',
   },
   clientCardWrapper: {
     marginBottom: 16,
