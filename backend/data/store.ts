@@ -49,6 +49,28 @@ async function dbQuery(query: string, vars?: Record<string, any>) {
   return results;
 }
 
+function normalizeId(id: any, tableName: string): string {
+  if (typeof id !== 'string') return String(id ?? '');
+  // SurrealDB returns ids like "tablename:recordid" or "tablename:⟨recordid⟩"
+  // Strip the table prefix and angle brackets to get the clean original id
+  const prefix = `${tableName}:`;
+  let clean = id;
+  if (clean.startsWith(prefix)) {
+    clean = clean.slice(prefix.length);
+  }
+  // Remove SurrealDB angle bracket notation for complex IDs
+  clean = clean.replace(/^⟨/, '').replace(/⟩$/, '');
+  return clean;
+}
+
+function normalizeRecord(item: any, tableName: string): any {
+  if (!item || typeof item !== 'object') return item;
+  if (typeof item.id === 'string' && item.id.includes(':')) {
+    return { ...item, id: normalizeId(item.id, tableName) };
+  }
+  return item;
+}
+
 function readFromMemory<T>(name: string, fallback: T): T {
   if (memoryStore.has(name)) {
     const stored = memoryStore.get(name);
@@ -76,8 +98,10 @@ export async function read<T>(name: string, fallback: T): Promise<T> {
     const result = await dbQuery(`SELECT * FROM ${name}`);
 
     if (result && result[0]?.result && result[0].result.length > 0) {
-      const data = result[0].result as T;
-      console.log(`📁 Loaded ${(result[0].result as any[]).length} items from DB [${name}]`);
+      // Normalize IDs: strip SurrealDB table prefix so IDs stay clean
+      const normalized = (result[0].result as any[]).map(item => normalizeRecord(item, name));
+      const data = normalized as unknown as T;
+      console.log(`📁 Loaded ${normalized.length} items from DB [${name}]`);
       writeToMemory(name, data);
       return data;
     }
@@ -115,11 +139,15 @@ export async function write<T>(name: string, data: T): Promise<void> {
 
     if (Array.isArray(data)) {
       for (const item of data) {
+        // Strip any existing SurrealDB table prefix before using as record key
         const rawId = item.id || Math.random().toString(36).substring(7);
-        const safeId = String(rawId).replace(/[^a-zA-Z0-9_-]/g, '_');
-        await dbQuery(`CREATE ${name}:⟨${safeId}⟩ CONTENT $item`, { item });
+        const cleanId = normalizeId(String(rawId), name);
+        const safeId = cleanId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        // Ensure item stored in DB also has the clean id (no table prefix)
+        const cleanItem = { ...item, id: cleanId };
+        await dbQuery(`CREATE ${name}:⟨${safeId}⟩ CONTENT $item`, { item: cleanItem });
       }
-      console.log(`✅ Wrote ${data.length} items to DB [${name}]`);
+      console.log(`✅ Wrote ${(data as any[]).length} items to DB [${name}]`);
     } else {
       await dbQuery(`CREATE ${name}:data CONTENT $item`, { item: data });
       console.log(`✅ Wrote data to DB [${name}]`);
