@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,133 +11,127 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { Send, CheckCircle, MessageCircle } from 'lucide-react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Send, ArrowLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMockData } from '@/contexts/MockDataContext';
+import { trpc } from '@/lib/trpc';
 import Colors from '@/constants/Colors';
-import Logo from '@/components/Logo';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const mockData = useMockData();
-
-  const conversas = mockData?.conversas ?? [];
-  const listMensagens = mockData?.listMensagens ?? (() => []);
-  const enviarMensagem = mockData?.enviarMensagem;
-  const marcarConversaComoResolvida = mockData?.marcarConversaComoResolvida;
-  const reabrirConversa = mockData?.reabrirConversa;
+  const router = useRouter();
 
   const [messageText, setMessageText] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [isResolving, setIsResolving] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const conversa = conversas.find((c: any) => c.id === id);
-  const mensagens = id ? listMensagens(id) : [];
+  const conversationId = id ?? '';
+
+  const employeesQuery = trpc.users.listEmployees.useQuery(undefined, {
+    enabled: !!user?.id,
+  });
+
+  const conversationsQuery = trpc.conversations.listMine.useQuery(
+    { userId: user?.id ?? '' },
+    {
+      enabled: !!user?.id && !!conversationId,
+      refetchInterval: 8000,
+    }
+  );
+
+  const messagesQuery = trpc.messages.listByConversation.useQuery(
+    { userId: user?.id ?? '', conversationId },
+    {
+      enabled: !!user?.id && !!conversationId,
+      refetchInterval: 5000,
+    }
+  );
+
+  const utils = trpc.useUtils();
+
+  const sendMutation = trpc.messages.send.useMutation({
+    onSuccess: () => {
+      void utils.messages.listByConversation.invalidate({ conversationId });
+      void utils.conversations.listMine.invalidate();
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    },
+    onError: (err) => {
+      Alert.alert('Erro', err.message || 'Não foi possível enviar a mensagem');
+    },
+  });
+
+  const conversation = useMemo(() => {
+    if (!conversationsQuery.data) return null;
+    return conversationsQuery.data.find((c: any) => c.id === conversationId) ?? null;
+  }, [conversationsQuery.data, conversationId]);
+
+  const messages: any[] = messagesQuery.data ?? [];
+
+  const nameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (user?.id) {
+      map[user.id] = user.fullName;
+    }
+    if (employeesQuery.data) {
+      for (const emp of employeesQuery.data as any[]) {
+        map[emp.id] = emp.name ?? emp.fullName ?? 'Colaborador';
+      }
+    }
+    return map;
+  }, [user, employeesQuery.data]);
 
   useEffect(() => {
-    if (mensagens.length > 0) {
+    if (messages.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [mensagens.length]);
+  }, [messages.length]);
 
-  const handleSend = async () => {
-    if (!messageText.trim() || !user?.id || !id || !enviarMensagem) return;
-
-    setIsSending(true);
-    try {
-      const result = await enviarMensagem(id, messageText.trim());
-      if (result) {
-        setMessageText('');
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      } else {
-        Alert.alert('Erro', 'Não foi possível enviar a mensagem');
-      }
-    } catch (error) {
-      console.error('ChatScreen: handleSend error:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao enviar a mensagem');
-    } finally {
-      setIsSending(false);
-    }
+  const handleSend = () => {
+    if (!messageText.trim() || !user?.id || !conversationId) return;
+    sendMutation.mutate({
+      userId: user.id,
+      conversationId,
+      text: messageText.trim(),
+    });
+    setMessageText('');
   };
 
-  const handleResolve = async () => {
-    if (!user?.id || !id || !marcarConversaComoResolvida) return;
-
-    Alert.alert(
-      'Resolver conversa',
-      'Tem certeza que deseja marcar esta conversa como resolvida?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Resolver',
-          onPress: async () => {
-            setIsResolving(true);
-            try {
-              await marcarConversaComoResolvida(id);
-            } catch (error) {
-              console.error('ChatScreen: handleResolve error:', error);
-              Alert.alert('Erro', 'Ocorreu um erro ao resolver a conversa');
-            } finally {
-              setIsResolving(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleReopen = async () => {
-    if (!user?.id || !id || !reabrirConversa) return;
-
-    setIsResolving(true);
-    try {
-      await reabrirConversa(id);
-    } catch (error) {
-      console.error('ChatScreen: handleReopen error:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao reabrir a conversa');
-    } finally {
-      setIsResolving(false);
-    }
-  };
-
-  const renderMessage = ({ item }: any) => {
-    const isMyMessage = item.autorId === user?.id;
+  const renderMessage = ({ item }: { item: any }) => {
+    const isMe = item.senderId === user?.id;
+    const senderName = nameMap[item.senderId] ?? 'Participante';
 
     return (
       <View
         style={[
           styles.messageContainer,
-          isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer,
+          isMe ? styles.myMessageContainer : styles.otherMessageContainer,
         ]}
       >
         <View
           style={[
             styles.messageBubble,
-            isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
+            isMe ? styles.myMessageBubble : styles.otherMessageBubble,
           ]}
         >
-          {!isMyMessage && (
-            <Text style={styles.senderName}>{item.autorNome}</Text>
+          {!isMe && (
+            <Text style={styles.senderName}>{senderName}</Text>
           )}
           <Text
             style={[
               styles.messageText,
-              isMyMessage ? styles.myMessageText : styles.otherMessageText,
+              isMe ? styles.myMessageText : styles.otherMessageText,
             ]}
           >
-            {item.texto}
+            {item.text}
           </Text>
           <Text
             style={[
               styles.messageTime,
-              isMyMessage ? styles.myMessageTime : styles.otherMessageTime,
+              isMe ? styles.myMessageTime : styles.otherMessageTime,
             ]}
           >
             {new Date(item.createdAt).toLocaleTimeString('pt-BR', {
@@ -150,16 +144,51 @@ export default function ChatScreen() {
     );
   };
 
-  if (!conversa) {
+  const isLoadingConversation =
+    conversationsQuery.isLoading && !conversationsQuery.data;
+
+  if (!user?.id) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.errorText}>Carregando conversa...</Text>
+        <Text style={styles.errorText}>Usuário não autenticado</Text>
       </View>
     );
   }
 
-  const canResolve = user?.type === 'employee' && conversa.status === 'aberta';
+  if (isLoadingConversation) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Carregando conversa...</Text>
+      </View>
+    );
+  }
+
+  if (!conversation && !conversationsQuery.isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Stack.Screen options={{ title: 'Chat' }} />
+        <Text style={styles.errorText}>Conversa não encontrada</Text>
+        <TouchableOpacity
+          style={styles.retryBtn}
+          onPress={() => {
+            void conversationsQuery.refetch();
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.retryBtnText}>Tentar novamente</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <ArrowLeft size={16} color={Colors.textLight} />
+          <Text style={styles.backBtnText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -167,97 +196,67 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <Logo size={80} />
       <Stack.Screen
         options={{
-          title: conversa.titulo,
-          headerRight: canResolve
-            ? () => (
-                <TouchableOpacity
-                  onPress={handleResolve}
-                  disabled={isResolving}
-                  activeOpacity={0.7}
-                >
-                  <CheckCircle
-                    size={24}
-                    color={isResolving ? Colors.textLight : '#10b981'}
-                  />
-                </TouchableOpacity>
-              )
-            : undefined,
+          title: 'Chat',
+          headerBackTitle: 'Voltar',
         }}
       />
 
       <FlatList
         ref={flatListRef}
-        data={mensagens}
+        data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContainer}
+        onContentSizeChange={() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Nenhuma mensagem ainda</Text>
-            <Text style={styles.emptySubtext}>
-              Envie uma mensagem para começar a conversa
-            </Text>
-          </View>
+          messagesQuery.isLoading ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Nenhuma mensagem ainda</Text>
+              <Text style={styles.emptySubtext}>
+                Envie uma mensagem para começar a conversa
+              </Text>
+            </View>
+          )
         }
       />
 
-      {conversa.status === 'aberta' && (
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={messageText}
-            onChangeText={setMessageText}
-            placeholder="Digite uma mensagem..."
-            placeholderTextColor={Colors.textLight}
-            multiline
-            maxLength={1000}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!messageText.trim() || isSending) && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!messageText.trim() || isSending}
-            activeOpacity={0.7}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Send size={20} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {conversa.status === 'resolvida' && (
-        <View style={styles.resolvedContainer}>
-          <View style={styles.resolvedBanner}>
-            <CheckCircle size={20} color="#10b981" />
-            <Text style={styles.resolvedText}>Conversa resolvida</Text>
-          </View>
-          {user?.type === 'employee' && (
-            <TouchableOpacity
-              style={[styles.reopenButton, isResolving && styles.reopenButtonDisabled]}
-              onPress={handleReopen}
-              disabled={isResolving}
-              activeOpacity={0.7}
-            >
-              {isResolving ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <MessageCircle size={20} color="#fff" />
-                  <Text style={styles.reopenButtonText}>Atender</Text>
-                </>
-              )}
-            </TouchableOpacity>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          value={messageText}
+          onChangeText={setMessageText}
+          placeholder="Digite uma mensagem..."
+          placeholderTextColor={Colors.textLight}
+          multiline
+          maxLength={1000}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
+          blurOnSubmit={false}
+        />
+        <TouchableOpacity
+          style={[
+            styles.sendButton,
+            (!messageText.trim() || sendMutation.isPending) && styles.sendButtonDisabled,
+          ]}
+          onPress={handleSend}
+          disabled={!messageText.trim() || sendMutation.isPending}
+          activeOpacity={0.7}
+        >
+          {sendMutation.isPending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Send size={20} color="#fff" />
           )}
-        </View>
-      )}
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -272,10 +271,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
     backgroundColor: Colors.background,
-    gap: 12,
+    gap: 16,
+    padding: 32,
+  },
+  loadingText: {
+    fontSize: 15,
+    color: Colors.textLight,
   },
   errorText: {
     fontSize: 16,
+    color: Colors.textLight,
+    textAlign: 'center' as const,
+  },
+  retryBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  retryBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  backBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingVertical: 8,
+  },
+  backBtnText: {
+    fontSize: 14,
     color: Colors.textLight,
   },
   messagesContainer: {
@@ -335,12 +361,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
     paddingVertical: 64,
+    gap: 8,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.text,
-    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
@@ -376,44 +402,5 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
-  },
-  resolvedContainer: {
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  resolvedBanner: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: 8,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  },
-  resolvedText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#10b981',
-  },
-  reopenButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: 8,
-    backgroundColor: Colors.primary,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingVertical: 14,
-    borderRadius: 8,
-  },
-  reopenButtonDisabled: {
-    opacity: 0.6,
-  },
-  reopenButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600' as const,
   },
 });
