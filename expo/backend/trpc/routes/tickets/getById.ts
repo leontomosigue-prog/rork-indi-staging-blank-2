@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { read } from "@/backend/data/store";
+import { read, readFresh } from "@/backend/data/store";
 import { Ticket, User } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 
@@ -11,17 +11,24 @@ export default publicProcedure
     const user = users.find(u => u.id === input.userId);
 
     if (!user) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
+      console.warn(`⚠️ User ${input.userId} not found in backend DB (may be a frontend-only user), proceeding anyway`);
     }
 
-    const tickets = await read<Ticket[]>("tickets", []);
-    const ticket = tickets.find(t => t.id === input.ticketId);
+    let tickets = await read<Ticket[]>("tickets", []);
+    let ticket = tickets.find(t => t.id === input.ticketId);
 
     if (!ticket) {
+      console.log(`⚠️ Ticket ${input.ticketId} not found in memory, forcing fresh read from DB...`);
+      tickets = await readFresh<Ticket[]>("tickets", []);
+      ticket = tickets.find(t => t.id === input.ticketId);
+    }
+
+    if (!ticket) {
+      console.error(`❌ Ticket ${input.ticketId} not found even after DB reload. Total: ${tickets.length}`);
       throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
     }
 
-    const customer = users.find(u => u.id === ticket.customerId);
+    const customer = users.find(u => u.id === ticket!.customerId);
 
     return {
       ...ticket,

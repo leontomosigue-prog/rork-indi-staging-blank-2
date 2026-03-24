@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
-import { read, write } from "@/backend/data/store";
+import { read, readFresh, write } from "@/backend/data/store";
 import { Conversation, User } from "@/backend/data/schemas";
 import { TRPCError } from "@trpc/server";
 
@@ -11,14 +11,20 @@ export default publicProcedure
     const user = users.find(u => u.id === input.userId);
 
     if (!user) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Usuário não encontrado" });
+      console.warn(`⚠️ User ${input.userId} not found in backend DB (may be a frontend-only user), proceeding anyway`);
     }
 
-    const conversations = await read<Conversation[]>("conversations", []);
-    const convIndex = conversations.findIndex(c => c.id === input.conversationId);
+    let conversations = await read<Conversation[]>("conversations", []);
+    let convIndex = conversations.findIndex(c => c.id === input.conversationId);
 
     if (convIndex === -1) {
-      console.warn(`[getById] Conversation ${input.conversationId} not found`);
+      console.log(`⚠️ Conversation ${input.conversationId} not found in memory, forcing fresh read from DB...`);
+      conversations = await readFresh<Conversation[]>("conversations", []);
+      convIndex = conversations.findIndex(c => c.id === input.conversationId);
+    }
+
+    if (convIndex === -1) {
+      console.warn(`[getById] Conversation ${input.conversationId} not found even after DB reload. Total: ${conversations.length}`);
       throw new TRPCError({ code: "NOT_FOUND", message: "Conversa não encontrada" });
     }
 
