@@ -10,6 +10,7 @@ export default publicProcedure
     z.object({
       userId: z.string(),
       ticketId: z.string(),
+      ticketData: z.any().optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -27,6 +28,28 @@ export default publicProcedure
       console.log(`⚠️ Ticket ${input.ticketId} not found in memory, forcing fresh read from DB...`);
       tickets = await readFresh<Ticket[]>("tickets", []);
       ticket = tickets.find(t => t.id === input.ticketId);
+    }
+
+    if (!ticket && input.ticketData) {
+      console.log(`⚠️ Ticket ${input.ticketId} not in backend, creating from provided ticketData...`);
+      const td = input.ticketData as any;
+      const now = new Date();
+      const syntheticTicket: Ticket = {
+        id: input.ticketId,
+        type: td.type ?? "parts_request",
+        area: td.area ?? "pecas",
+        priority: td.priority,
+        status: td.status ?? "em_andamento",
+        customerId: td.customerId ?? input.userId,
+        assigneeId: td.assigneeId,
+        payload: td.payload,
+        createdAt: td.createdAt ? new Date(td.createdAt) : now,
+        updatedAt: now,
+      };
+      tickets.push(syntheticTicket);
+      await write("tickets", tickets);
+      ticket = syntheticTicket;
+      console.log(`✅ Synthetic ticket created in backend for conversation flow: ${input.ticketId}`);
     }
 
     if (!ticket) {

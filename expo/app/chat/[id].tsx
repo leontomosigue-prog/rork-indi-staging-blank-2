@@ -32,6 +32,8 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
+import { dataGateway } from '@/lib/data-gateway';
+import { useQuery as useRQQuery, useMutation as useRQMutation, useQueryClient } from '@tanstack/react-query';
 import Colors from '@/constants/Colors';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -240,13 +242,16 @@ export default function ChatScreen() {
   const conversation = conversationQuery.data ?? null;
   const ticketId = conversation?.ticketId ?? '';
 
-  const ticketQuery = trpc.tickets.getById.useQuery(
-    { userId: user?.id ?? '', ticketId },
-    {
-      enabled: !!user?.id && !!ticketId,
-      placeholderData: (prev: any) => prev,
-    }
-  );
+  const ticketQuery = useRQQuery({
+    queryKey: ['ticket', ticketId],
+    queryFn: async () => {
+      if (!ticketId) return null;
+      const r = await dataGateway.getTicketById(ticketId);
+      return r.status === 'ok' ? r.data : null;
+    },
+    enabled: !!ticketId,
+    placeholderData: (prev: any) => prev,
+  });
 
   const messagesQuery = trpc.messages.listByConversation.useQuery(
     { userId: user?.id ?? '', conversationId },
@@ -272,16 +277,22 @@ export default function ChatScreen() {
     },
   });
 
-  const resolveTicketMutation = trpc.tickets.updateStatus.useMutation({
+  const rqClient = useQueryClient();
+
+  const resolveTicketMutation = useRQMutation({
+    mutationFn: async ({ ticketId: tid }: { userId: string; ticketId: string; status: string }) => {
+      const r = await dataGateway.atualizarStatusTicket(tid, 'resolvido');
+      if (r.status === 'error') throw new Error(r.errorMessage);
+      return r.data;
+    },
     onSuccess: () => {
-      void utils.tickets.listAssignedToMe.invalidate();
-      void utils.tickets.listResolved.invalidate();
-      void utils.tickets.getById.invalidate({ ticketId });
+      void rqClient.invalidateQueries({ queryKey: ['tickets'] });
+      void rqClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
       Alert.alert('Chamado resolvido', 'O chamado foi marcado como resolvido com sucesso.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       Alert.alert('Erro', err.message || 'Não foi possível resolver o chamado');
     },
   });

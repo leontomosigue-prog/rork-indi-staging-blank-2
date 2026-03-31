@@ -59,7 +59,26 @@ const STORAGE_KEYS = {
   PECAS: '@indi:mock:pecas',
   USERS_DB: '@indi:usersDb',
   USER_ID: '@indi:userId',
+  TICKETS: '@indi:tickets',
 } as const;
+
+export type LocalTicket = {
+  id: string;
+  type: 'sales_quote' | 'rental_request' | 'service' | 'parts_request';
+  area: 'vendas' | 'locacao' | 'assistencia' | 'pecas';
+  priority?: 'preventiva' | 'urgente' | 'para_ontem';
+  status: 'aberto' | 'em_andamento' | 'resolvido' | 'arquivado';
+  customerId: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerCpf?: string;
+  customerCompanyName?: string;
+  customerCnpj?: string;
+  assigneeId?: string;
+  payload?: any;
+  createdAt: string;
+  updatedAt: string;
+};
 
 const MOCK_MAQUINAS_VENDAS: Maquina[] = [
   {
@@ -884,6 +903,182 @@ class DataGateway {
     } catch (error) {
       this.logResponse('admin', 'atualizarColaborador', 'error', 'UPDATE_FAILED');
       return { status: 'error', errorCode: 'UPDATE_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async criarTicket(data: {
+    userId: string;
+    userName?: string;
+    userEmail?: string;
+    userCpf?: string;
+    userCompanyName?: string;
+    userCnpj?: string;
+    type: LocalTicket['type'];
+    area: LocalTicket['area'];
+    priority?: LocalTicket['priority'];
+    payload?: any;
+  }): Promise<ApiResponse<LocalTicket>> {
+    this.logRequest('tickets', 'criarTicket', { userId: data.userId, type: data.type, area: data.area });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+
+      const now = new Date().toISOString();
+      const newTicket: LocalTicket = {
+        id: `${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`,
+        type: data.type,
+        area: data.area,
+        priority: data.priority,
+        status: 'aberto',
+        customerId: data.userId,
+        customerName: data.userName,
+        customerEmail: data.userEmail,
+        customerCpf: data.userCpf,
+        customerCompanyName: data.userCompanyName,
+        customerCnpj: data.userCnpj,
+        payload: data.payload,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      tickets.push(newTicket);
+      await AsyncStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      console.log(`[DataGateway] criarTicket: created ticket ${newTicket.id}`);
+      this.logResponse('tickets', 'criarTicket', 'ok');
+      return { status: 'ok', data: newTicket };
+    } catch (error) {
+      this.logResponse('tickets', 'criarTicket', 'error', 'CREATE_FAILED');
+      return { status: 'error', errorCode: 'CREATE_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async listarTicketsDisponiveis(area?: string): Promise<ApiResponse<LocalTicket[]>> {
+    this.logRequest('tickets', 'listarTicketsDisponiveis', { area });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const available = tickets.filter(t => {
+        const isOpen = t.status === 'aberto';
+        const isUnassigned = !t.assigneeId;
+        const matchesArea = !area || t.area === area;
+        return isOpen && isUnassigned && matchesArea;
+      });
+      this.logResponse('tickets', 'listarTicketsDisponiveis', 'ok');
+      return { status: 'ok', data: available };
+    } catch (error) {
+      this.logResponse('tickets', 'listarTicketsDisponiveis', 'error', 'FETCH_FAILED');
+      return { status: 'error', errorCode: 'FETCH_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async listarMeusAtendimentos(employeeId: string): Promise<ApiResponse<LocalTicket[]>> {
+    this.logRequest('tickets', 'listarMeusAtendimentos', { employeeId });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const mine = tickets.filter(t => t.assigneeId === employeeId && t.status === 'em_andamento');
+      this.logResponse('tickets', 'listarMeusAtendimentos', 'ok');
+      return { status: 'ok', data: mine };
+    } catch (error) {
+      this.logResponse('tickets', 'listarMeusAtendimentos', 'error', 'FETCH_FAILED');
+      return { status: 'error', errorCode: 'FETCH_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async listarTicketsResolvidos(options?: { employeeId?: string; area?: string }): Promise<ApiResponse<LocalTicket[]>> {
+    this.logRequest('tickets', 'listarTicketsResolvidos', options);
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const resolved = tickets.filter(t => {
+        if (t.status !== 'resolvido') return false;
+        if (options?.employeeId && t.assigneeId !== options.employeeId) return false;
+        if (options?.area && t.area !== options.area) return false;
+        return true;
+      });
+      this.logResponse('tickets', 'listarTicketsResolvidos', 'ok');
+      return { status: 'ok', data: resolved };
+    } catch (error) {
+      this.logResponse('tickets', 'listarTicketsResolvidos', 'error', 'FETCH_FAILED');
+      return { status: 'error', errorCode: 'FETCH_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async listarMeusPedidos(customerId: string): Promise<ApiResponse<LocalTicket[]>> {
+    this.logRequest('tickets', 'listarMeusPedidos', { customerId });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const mine = tickets.filter(t => t.customerId === customerId);
+      this.logResponse('tickets', 'listarMeusPedidos', 'ok');
+      return { status: 'ok', data: mine };
+    } catch (error) {
+      this.logResponse('tickets', 'listarMeusPedidos', 'error', 'FETCH_FAILED');
+      return { status: 'error', errorCode: 'FETCH_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async assumirTicket(ticketId: string, employeeId: string): Promise<ApiResponse<LocalTicket>> {
+    this.logRequest('tickets', 'assumirTicket', { ticketId, employeeId });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const idx = tickets.findIndex(t => t.id === ticketId);
+      if (idx === -1) {
+        this.logResponse('tickets', 'assumirTicket', 'error', 'NOT_FOUND');
+        return { status: 'error', errorCode: 'NOT_FOUND', errorMessage: 'Pedido não encontrado' };
+      }
+      if (tickets[idx].assigneeId) {
+        this.logResponse('tickets', 'assumirTicket', 'error', 'CONFLICT');
+        return { status: 'error', errorCode: 'CONFLICT', errorMessage: 'Este pedido já foi assumido por outro colaborador' };
+      }
+      if (tickets[idx].status !== 'aberto') {
+        this.logResponse('tickets', 'assumirTicket', 'error', 'CONFLICT');
+        return { status: 'error', errorCode: 'CONFLICT', errorMessage: 'Este pedido não está mais disponível' };
+      }
+      tickets[idx] = { ...tickets[idx], assigneeId: employeeId, status: 'em_andamento', updatedAt: new Date().toISOString() };
+      await AsyncStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      console.log(`[DataGateway] assumirTicket: ticket ${ticketId} taken by ${employeeId}`);
+      this.logResponse('tickets', 'assumirTicket', 'ok');
+      return { status: 'ok', data: tickets[idx] };
+    } catch (error) {
+      this.logResponse('tickets', 'assumirTicket', 'error', 'UPDATE_FAILED');
+      return { status: 'error', errorCode: 'UPDATE_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async atualizarStatusTicket(ticketId: string, status: LocalTicket['status']): Promise<ApiResponse<LocalTicket>> {
+    this.logRequest('tickets', 'atualizarStatusTicket', { ticketId, status });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const idx = tickets.findIndex(t => t.id === ticketId);
+      if (idx === -1) {
+        this.logResponse('tickets', 'atualizarStatusTicket', 'error', 'NOT_FOUND');
+        return { status: 'error', errorCode: 'NOT_FOUND', errorMessage: 'Pedido não encontrado' };
+      }
+      tickets[idx] = { ...tickets[idx], status, updatedAt: new Date().toISOString() };
+      await AsyncStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      console.log(`[DataGateway] atualizarStatusTicket: ticket ${ticketId} → ${status}`);
+      this.logResponse('tickets', 'atualizarStatusTicket', 'ok');
+      return { status: 'ok', data: tickets[idx] };
+    } catch (error) {
+      this.logResponse('tickets', 'atualizarStatusTicket', 'error', 'UPDATE_FAILED');
+      return { status: 'error', errorCode: 'UPDATE_FAILED', errorMessage: String(error) };
+    }
+  }
+
+  async getTicketById(ticketId: string): Promise<ApiResponse<LocalTicket | null>> {
+    this.logRequest('tickets', 'getTicketById', { ticketId });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const ticket = tickets.find(t => t.id === ticketId) ?? null;
+      this.logResponse('tickets', 'getTicketById', 'ok');
+      return { status: 'ok', data: ticket };
+    } catch (error) {
+      this.logResponse('tickets', 'getTicketById', 'error', 'FETCH_FAILED');
+      return { status: 'error', errorCode: 'FETCH_FAILED', errorMessage: String(error) };
     }
   }
 

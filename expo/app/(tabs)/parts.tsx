@@ -16,7 +16,8 @@ import { Stack } from 'expo-router';
 import { Plus, Edit2, Trash2, Package, Search, ImageIcon, X, CheckCircle, ShoppingCart, Minus, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMockData } from '@/contexts/MockDataContext';
-import { trpc } from '@/lib/trpc';
+import { dataGateway } from '@/lib/data-gateway';
+import { useMutation } from '@tanstack/react-query';
 import Colors from '@/constants/Colors';
 import Logo from '@/components/Logo';
 
@@ -70,11 +71,22 @@ export default function PartsScreen() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartVisible, setCartVisible] = useState(false);
 
-  const createTicketMutation = trpc.tickets.create.useMutation({
-    onSuccess: () => {
-      console.log('Ticket de peça criado com sucesso');
+  const createTicketMutation = useMutation({
+    mutationFn: async (data: {
+      userId: string;
+      userName?: string;
+      userEmail?: string;
+      type: 'parts_request';
+      area: 'pecas';
+      payload: any;
+    }) => {
+      const response = await dataGateway.criarTicket(data);
+      if (response.status === 'error') {
+        throw new Error(response.errorMessage || 'Erro ao criar pedido');
+      }
+      return response.data;
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Erro ao criar ticket:', error);
       Alert.alert('Erro', 'Não foi possível criar a solicitação. Tente novamente.');
     },
@@ -232,13 +244,18 @@ export default function PartsScreen() {
     createTicketMutation.mutate(
       {
         userId: user.id,
+        userName: user.fullName,
+        userEmail: user.email,
+        userCpf: user.cpf,
+        userCompanyName: user.companyName,
+        userCnpj: user.cnpj,
         type: 'parts_request',
         area: 'pecas',
         payload: {
           description: `Pedido de ${totalItems} peça(s): ${partNames}`,
           parts: partsPayload,
         },
-      },
+      } as any,
       {
         onSuccess: () => {
           setCart([]);

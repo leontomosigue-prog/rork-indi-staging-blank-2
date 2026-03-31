@@ -39,7 +39,9 @@ import {
   Square,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '@/lib/trpc';
+import { dataGateway } from '@/lib/data-gateway';
 import { useAuth } from '@/contexts/AuthContext';
 import Colors from '@/constants/Colors';
 import type { Role } from '@/types';
@@ -505,58 +507,80 @@ function ChamadosTab() {
     }, 0);
   }, [detailsTicket?.payload?.parts]);
 
-  const availableQuery = trpc.tickets.listAvailable.useQuery(
-    { userId: user?.id ?? '', area: employeeArea ?? undefined },
-    {
-      enabled: !!user?.id && canSeeQueue,
-      placeholderData: (prev: any) => prev,
-    }
-  );
+  const queryClient = useQueryClient();
 
-  const assignedQuery = trpc.tickets.listAssignedToMe.useQuery(
-    { userId: user?.id ?? '' },
-    {
-      enabled: !!user?.id && canSeeQueue,
-      placeholderData: (prev: any) => prev,
-    }
-  );
+  const availableQuery = useQuery({
+    queryKey: ['tickets', 'available', employeeArea ?? 'all'],
+    queryFn: async () => {
+      const r = await dataGateway.listarTicketsDisponiveis(employeeArea ?? undefined);
+      if (r.status === 'error') return [];
+      return r.data;
+    },
+    enabled: !!user?.id && canSeeQueue,
+    placeholderData: (prev: any) => prev,
+  });
 
-  const resolvedQuery = trpc.tickets.listResolved.useQuery(
-    { userId: user?.id ?? '', area: employeeArea ?? undefined },
-    {
-      enabled: !!user?.id && canSeeQueue,
-      placeholderData: (prev: any) => prev,
-    }
-  );
+  const assignedQuery = useQuery({
+    queryKey: ['tickets', 'assigned', user?.id ?? ''],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const r = await dataGateway.listarMeusAtendimentos(user.id);
+      if (r.status === 'error') return [];
+      return r.data;
+    },
+    enabled: !!user?.id && canSeeQueue,
+    placeholderData: (prev: any) => prev,
+  });
+
+  const resolvedQuery = useQuery({
+    queryKey: ['tickets', 'resolved', user?.id ?? '', employeeArea ?? 'all'],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const r = await dataGateway.listarTicketsResolvidos({ employeeId: user.id, area: employeeArea ?? undefined });
+      if (r.status === 'error') return [];
+      return r.data;
+    },
+    enabled: !!user?.id && canSeeQueue,
+    placeholderData: (prev: any) => prev,
+  });
 
   const [showResolved, setShowResolved] = useState(false);
 
-  const myTicketsQuery = trpc.tickets.listMine.useQuery(
-    { userId: user?.id ?? '' },
-    {
-      enabled: !!user?.id && isCustomer,
-    }
-  );
+  const myTicketsQuery = useQuery({
+    queryKey: ['tickets', 'mine', user?.id ?? ''],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const r = await dataGateway.listarMeusPedidos(user.id);
+      if (r.status === 'error') return [];
+      return r.data;
+    },
+    enabled: !!user?.id && isCustomer,
+  });
 
-  const utils = trpc.useUtils();
-
-  const updateStatusMutation = trpc.tickets.updateStatus.useMutation({
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ ticketId, status }: { userId: string; ticketId: string; status: any }) => {
+      const r = await dataGateway.atualizarStatusTicket(ticketId, status);
+      if (r.status === 'error') throw new Error(r.errorMessage);
+      return r.data;
+    },
     onSuccess: () => {
-      void utils.tickets.listAssignedToMe.invalidate();
-      void utils.tickets.listAvailable.invalidate();
-      void utils.tickets.listResolved.invalidate();
+      void queryClient.invalidateQueries({ queryKey: ['tickets'] });
       setManageVisible(false);
       setManageTicket(null);
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       Alert.alert('Erro', err.message);
     },
   });
 
-  const takeMutation = trpc.tickets.take.useMutation({
+  const takeMutation = useMutation({
+    mutationFn: async ({ userId, ticketId }: { userId: string; ticketId: string }) => {
+      const r = await dataGateway.assumirTicket(ticketId, userId);
+      if (r.status === 'error') throw new Error(r.errorMessage);
+      return r.data;
+    },
     onSuccess: () => {
-      void utils.tickets.listAvailable.invalidate();
-      void utils.tickets.listAssignedToMe.invalidate();
+      void queryClient.invalidateQueries({ queryKey: ['tickets'] });
       const ticket = pendingTicketRef.current;
       setTakingId(null);
       if (ticket) {
@@ -566,9 +590,9 @@ function ChamadosTab() {
         pendingTicketRef.current = null;
       }
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       Alert.alert('Pedido indisponível', err.message);
-      void utils.tickets.listAvailable.invalidate();
+      void queryClient.invalidateQueries({ queryKey: ['tickets', 'available'] });
       setTakingId(null);
       pendingTicketRef.current = null;
     },
@@ -637,14 +661,22 @@ function ChamadosTab() {
   const handleContinueToChat = () => {
     if (!user?.id || !detailsTicket) return;
     setIsCreatingConversation(true);
-    createConversationMutation.mutate({ userId: user.id, ticketId: detailsTicket.id });
+    createConversationMutation.mutate({
+      userId: user.id,
+      ticketId: detailsTicket.id,
+      ticketData: detailsTicket,
+    } as any);
   };
 
   const handleOpenChatFromManage = () => {
     if (!user?.id || !manageTicket) return;
     setManageVisible(false);
     setIsCreatingConversation(true);
-    createConversationMutation.mutate({ userId: user.id, ticketId: manageTicket.id });
+    createConversationMutation.mutate({
+      userId: user.id,
+      ticketId: manageTicket.id,
+      ticketData: manageTicket,
+    } as any);
   };
 
   const togglePartCheck = (partId: string) => {
@@ -653,13 +685,11 @@ function ChamadosTab() {
 
   const isRefreshing =
     (availableQuery.isFetching && !availableQuery.isLoading) ||
-    (assignedQuery.isFetching && !assignedQuery.isLoading);
+    (assignedQuery.isFetching && !assignedQuery.isLoading) ||
+    (myTicketsQuery.isFetching && !myTicketsQuery.isLoading);
 
   const handleRefresh = () => {
-    void availableQuery.refetch();
-    void assignedQuery.refetch();
-    void myTicketsQuery.refetch();
-    void resolvedQuery.refetch();
+    void queryClient.invalidateQueries({ queryKey: ['tickets'] });
   };
 
   const available: any[] = availableQuery.data ?? [];
