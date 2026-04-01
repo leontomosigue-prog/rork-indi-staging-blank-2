@@ -478,6 +478,7 @@ function ChamadosTab() {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [partsVisible, setPartsVisible] = useState(false);
   const [checkedParts, setCheckedParts] = useState<Record<string, boolean>>({});
+  const [omNumber, setOmNumber] = useState<string>('');
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [manageTicket, setManageTicket] = useState<any>(null);
   const [manageVisible, setManageVisible] = useState(false);
@@ -586,6 +587,7 @@ function ChamadosTab() {
       if (ticket) {
         setDetailsTicket(ticket);
         setCheckedParts({});
+        setOmNumber('');
         setDetailsVisible(true);
         pendingTicketRef.current = null;
       }
@@ -665,6 +667,7 @@ function ChamadosTab() {
       userId: user.id,
       ticketId: detailsTicket.id,
       ticketData: detailsTicket,
+      omNumber: omNumber.trim() || undefined,
     } as any);
   };
 
@@ -1023,6 +1026,19 @@ function ChamadosTab() {
             <Text style={partsModalStyles.headerCount}>
               {Object.values(checkedParts).filter(Boolean).length} / {expandedParts.length}
             </Text>
+          </View>
+
+          <View style={partsModalStyles.omContainer}>
+            <Text style={partsModalStyles.omLabel}>Nº da Ordem de Manutenção (OM)</Text>
+            <TextInput
+              style={partsModalStyles.omInput}
+              value={omNumber}
+              onChangeText={setOmNumber}
+              placeholder="Ex: OM-2024-001"
+              placeholderTextColor="rgba(255,255,255,0.25)"
+              autoCapitalize="characters"
+              returnKeyType="done"
+            />
           </View>
 
           <ScrollView style={partsModalStyles.list} contentContainerStyle={{ paddingBottom: 20 }}>
@@ -2363,6 +2379,34 @@ const partsModalStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',
+  },
+  omContainer: {
+    marginBottom: 14,
+    backgroundColor: 'rgba(255,149,0,0.06)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,149,0,0.2)',
+  },
+  omLabel: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: 'rgba(255,149,0,0.8)',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase' as const,
+    marginBottom: 8,
+  },
+  omInput: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#3A3A3A',
+    letterSpacing: 0.5,
   },
 });
 

@@ -29,6 +29,7 @@ import {
   ClipboardList,
   Calendar,
   CheckCircle,
+  FileText,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
@@ -166,6 +167,16 @@ function ClientInfoCard({ ticket }: { ticket: any }) {
             )}
           </View>
         </View>
+
+        {ticket?.payload?.omNumber && (
+          <View style={clientStyles.section}>
+            <Text style={clientStyles.sectionLabel}>ORDEM DE MANUTENÇÃO</Text>
+            <View style={clientStyles.omBadge}>
+              <FileText size={13} color="#FF9500" />
+              <Text style={clientStyles.omText}>{ticket.payload.omNumber}</Text>
+            </View>
+          </View>
+        )}
 
         {ticket?.payload?.description && (
           <View style={clientStyles.section}>
@@ -668,6 +679,24 @@ const clientStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700' as const,
     color: '#34C759',
+  },
+  omBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 7,
+    backgroundColor: 'rgba(255,149,0,0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,149,0,0.25)',
+    alignSelf: 'flex-start' as const,
+  },
+  omText: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#FF9500',
+    letterSpacing: 0.5,
   },
 });
 

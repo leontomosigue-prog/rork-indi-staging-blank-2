@@ -11,6 +11,7 @@ export default publicProcedure
       userId: z.string(),
       ticketId: z.string(),
       ticketData: z.any().optional(),
+      omNumber: z.string().optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -55,6 +56,16 @@ export default publicProcedure
     if (!ticket) {
       console.error(`❌ Ticket ${input.ticketId} not found even after DB reload. Total tickets: ${tickets.length}. IDs: ${tickets.map(t => t.id).join(', ')}`);
       throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
+    }
+
+    if (input.omNumber) {
+      ticket.payload = { ...(ticket.payload ?? {}), omNumber: input.omNumber };
+      const idx = tickets.findIndex(t => t.id === ticket!.id);
+      if (idx >= 0) {
+        tickets[idx] = ticket;
+        await write("tickets", tickets);
+        console.log(`✅ OM number "${input.omNumber}" saved to ticket ${ticket.id}`);
+      }
     }
 
     let conversations = await read<Conversation[]>("conversations", []);
