@@ -12,6 +12,8 @@ export default publicProcedure
       conversationId: z.string(),
       text: z.string(),
       attachments: z.array(z.string()).optional(),
+      type: z.enum(['text', 'budget_proposal', 'budget_response']).optional(),
+      metadata: z.record(z.string(), z.any()).optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -52,6 +54,8 @@ export default publicProcedure
       senderId: input.userId,
       text: input.text,
       attachments: input.attachments,
+      type: input.type,
+      metadata: input.metadata,
       createdAt: now,
     };
 

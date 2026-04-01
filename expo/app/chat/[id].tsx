@@ -12,6 +12,8 @@ import {
   Alert,
   Animated,
   Pressable,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -30,6 +32,13 @@ import {
   Calendar,
   CheckCircle,
   FileText,
+  Paperclip,
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  DollarSign,
+  FileCheck,
+  FileX,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
@@ -226,12 +235,122 @@ function ClientInfoCard({ ticket }: { ticket: any }) {
   );
 }
 
+function BudgetProposalBubble({
+  item,
+  isMe,
+  isEmployee,
+  onApprove,
+  onReject,
+  allMessages,
+}: {
+  item: any;
+  isMe: boolean;
+  isEmployee: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+  allMessages: any[];
+}) {
+  const meta = item.metadata ?? {};
+  const budgetId = item.id;
+
+  const response = allMessages.find(
+    (m: any) =>
+      m.type === 'budget_response' &&
+      m.metadata?.budgetMessageId === budgetId
+  );
+
+  const isApproved = response?.metadata?.decision === 'approved';
+  const hasResponse = !!response;
+
+  const canRespond = !isEmployee && !hasResponse;
+
+  return (
+    <View style={[budgetStyles.bubble, isMe ? budgetStyles.bubbleRight : budgetStyles.bubbleLeft]}>
+      <View style={budgetStyles.header}>
+        <View style={budgetStyles.iconWrap}>
+          <FileText size={16} color="#007AFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={budgetStyles.label}>Orçamento</Text>
+          {meta.title ? <Text style={budgetStyles.title}>{meta.title}</Text> : null}
+        </View>
+      </View>
+
+      {meta.description ? (
+        <Text style={budgetStyles.description}>{meta.description}</Text>
+      ) : null}
+
+      {meta.value ? (
+        <View style={budgetStyles.valueRow}>
+          <DollarSign size={13} color="#34C759" />
+          <Text style={budgetStyles.value}>
+            R$ {Number(meta.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+      ) : null}
+
+      {meta.notes ? (
+        <Text style={budgetStyles.notes}>{meta.notes}</Text>
+      ) : null}
+
+      <View style={budgetStyles.divider} />
+
+      {hasResponse ? (
+        <View style={[budgetStyles.responseRow, isApproved ? budgetStyles.approvedRow : budgetStyles.rejectedRow]}>
+          {isApproved ? (
+            <FileCheck size={14} color="#34C759" />
+          ) : (
+            <FileX size={14} color="#FF3B30" />
+          )}
+          <Text style={[budgetStyles.responseText, isApproved ? budgetStyles.approvedText : budgetStyles.rejectedText]}>
+            {isApproved ? 'Orçamento aprovado' : 'Orçamento recusado'}
+          </Text>
+        </View>
+      ) : canRespond ? (
+        <View style={budgetStyles.actions}>
+          <TouchableOpacity
+            style={budgetStyles.rejectBtn}
+            onPress={onReject}
+            activeOpacity={0.75}
+          >
+            <ThumbsDown size={14} color="#FF3B30" />
+            <Text style={budgetStyles.rejectBtnText}>Recusar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={budgetStyles.approveBtn}
+            onPress={onApprove}
+            activeOpacity={0.75}
+          >
+            <ThumbsUp size={14} color="#fff" />
+            <Text style={budgetStyles.approveBtnText}>Aprovar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Text style={budgetStyles.pendingText}>Aguardando resposta do cliente...</Text>
+      )}
+
+      <Text style={[budgetStyles.time, isMe ? budgetStyles.timeRight : budgetStyles.timeLeft]}>
+        {new Date(item.createdAt).toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </Text>
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
 
   const [messageText, setMessageText] = useState('');
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [budgetTitle, setBudgetTitle] = useState('');
+  const [budgetValue, setBudgetValue] = useState('');
+  const [budgetDescription, setBudgetDescription] = useState('');
+  const [budgetNotes, setBudgetNotes] = useState('');
+
   const flatListRef = useRef<FlatList>(null);
 
   const conversationId = id ?? '';
@@ -341,6 +460,56 @@ export default function ChatScreen() {
     setMessageText('');
   };
 
+  const handleSendBudget = () => {
+    if (!budgetTitle.trim() || !user?.id || !conversationId) return;
+    const valueNum = parseFloat(budgetValue.replace(',', '.'));
+    sendMutation.mutate({
+      userId: user.id,
+      conversationId,
+      text: `Orçamento enviado: ${budgetTitle}`,
+      type: 'budget_proposal',
+      metadata: {
+        title: budgetTitle.trim(),
+        value: isNaN(valueNum) ? undefined : valueNum,
+        description: budgetDescription.trim() || undefined,
+        notes: budgetNotes.trim() || undefined,
+      },
+    } as any);
+    setBudgetTitle('');
+    setBudgetValue('');
+    setBudgetDescription('');
+    setBudgetNotes('');
+    setShowBudgetModal(false);
+  };
+
+  const handleBudgetResponse = (budgetMessageId: string, decision: 'approved' | 'rejected') => {
+    if (!user?.id || !conversationId) return;
+    const label = decision === 'approved' ? 'aprovado' : 'recusado';
+    Alert.alert(
+      decision === 'approved' ? 'Aprovar Orçamento' : 'Recusar Orçamento',
+      `Confirmar que deseja ${label === 'aprovado' ? 'aprovar' : 'recusar'} este orçamento?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: decision === 'approved' ? 'Aprovar' : 'Recusar',
+          style: decision === 'approved' ? 'default' : 'destructive',
+          onPress: () => {
+            sendMutation.mutate({
+              userId: user.id,
+              conversationId,
+              text: `Orçamento ${label} pelo cliente.`,
+              type: 'budget_response',
+              metadata: {
+                budgetMessageId,
+                decision,
+              },
+            } as any);
+          },
+        },
+      ]
+    );
+  };
+
   const ticket = ticketQuery.data;
   const isEmployee = (user?.roles?.length ?? 0) > 0;
   const canResolve = isEmployee && ticket?.status === 'em_andamento';
@@ -369,6 +538,34 @@ export default function ChatScreen() {
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.senderId === user?.id;
     const senderName = nameMap[item.senderId] ?? 'Participante';
+
+    if (item.type === 'budget_response') {
+      return null;
+    }
+
+    if (item.type === 'budget_proposal') {
+      return (
+        <View
+          style={[
+            styles.messageContainer,
+            isMe ? styles.myMessageContainer : styles.otherMessageContainer,
+            { maxWidth: '90%' },
+          ]}
+        >
+          {!isMe && (
+            <Text style={styles.senderNameOutside}>{senderName}</Text>
+          )}
+          <BudgetProposalBubble
+            item={item}
+            isMe={isMe}
+            isEmployee={isEmployee}
+            allMessages={messages}
+            onApprove={() => handleBudgetResponse(item.id, 'approved')}
+            onReject={() => handleBudgetResponse(item.id, 'rejected')}
+          />
+        </View>
+      );
+    }
 
     return (
       <View
@@ -525,6 +722,15 @@ export default function ChatScreen() {
       />
 
       <View style={styles.inputContainer}>
+        {isEmployee && (
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={() => setShowBudgetModal(true)}
+            activeOpacity={0.7}
+          >
+            <Paperclip size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        )}
         <TextInput
           style={styles.input}
           value={messageText}
@@ -553,9 +759,380 @@ export default function ChatScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showBudgetModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBudgetModal(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={modalStyles.sheet}>
+            <View style={modalStyles.header}>
+              <View style={modalStyles.headerLeft}>
+                <View style={modalStyles.iconWrap}>
+                  <FileText size={18} color="#007AFF" />
+                </View>
+                <Text style={modalStyles.title}>Enviar Orçamento</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowBudgetModal(false)}
+                style={modalStyles.closeBtn}
+                activeOpacity={0.7}
+              >
+                <X size={20} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={modalStyles.body} showsVerticalScrollIndicator={false}>
+              <Text style={modalStyles.fieldLabel}>Título do Orçamento *</Text>
+              <TextInput
+                style={modalStyles.input}
+                value={budgetTitle}
+                onChangeText={setBudgetTitle}
+                placeholder="Ex: Orçamento de Peças - Empilhadeira"
+                placeholderTextColor="rgba(255,255,255,0.25)"
+              />
+
+              <Text style={modalStyles.fieldLabel}>Valor Total (R$)</Text>
+              <TextInput
+                style={modalStyles.input}
+                value={budgetValue}
+                onChangeText={setBudgetValue}
+                placeholder="Ex: 1500,00"
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                keyboardType="decimal-pad"
+              />
+
+              <Text style={modalStyles.fieldLabel}>Descrição</Text>
+              <TextInput
+                style={[modalStyles.input, modalStyles.textArea]}
+                value={budgetDescription}
+                onChangeText={setBudgetDescription}
+                placeholder="Descreva os serviços/produtos incluídos no orçamento..."
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                multiline
+                numberOfLines={4}
+              />
+
+              <Text style={modalStyles.fieldLabel}>Observações</Text>
+              <TextInput
+                style={[modalStyles.input, modalStyles.textArea]}
+                value={budgetNotes}
+                onChangeText={setBudgetNotes}
+                placeholder="Condições de pagamento, prazo de entrega, validade do orçamento..."
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                multiline
+                numberOfLines={3}
+              />
+            </ScrollView>
+
+            <View style={modalStyles.footer}>
+              <TouchableOpacity
+                style={modalStyles.cancelBtn}
+                onPress={() => setShowBudgetModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={modalStyles.cancelBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalStyles.sendBtn,
+                  !budgetTitle.trim() && modalStyles.sendBtnDisabled,
+                ]}
+                onPress={handleSendBudget}
+                disabled={!budgetTitle.trim() || sendMutation.isPending}
+                activeOpacity={0.7}
+              >
+                {sendMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Send size={15} color="#fff" />
+                    <Text style={modalStyles.sendBtnText}>Enviar Orçamento</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
+
+const budgetStyles = StyleSheet.create({
+  bubble: {
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    minWidth: 220,
+  },
+  bubbleRight: {
+    backgroundColor: '#1A2A3A',
+    borderColor: 'rgba(0,122,255,0.3)',
+  },
+  bubbleLeft: {
+    backgroundColor: '#1E2328',
+    borderColor: 'rgba(0,122,255,0.25)',
+  },
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    marginBottom: 10,
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,122,255,0.12)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: '#007AFF',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase' as const,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+  description: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  valueRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginBottom: 8,
+  },
+  value: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#34C759',
+  },
+  notes: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 17,
+    marginBottom: 8,
+    fontStyle: 'italic' as const,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 10,
+  },
+  actions: {
+    flexDirection: 'row' as const,
+    gap: 8,
+    marginBottom: 4,
+  },
+  rejectBtn: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,59,48,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.3)',
+  },
+  rejectBtnText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#FF3B30',
+  },
+  approveBtn: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#007AFF',
+  },
+  approveBtnText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#fff',
+  },
+  responseRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  approvedRow: {
+    backgroundColor: 'rgba(52,199,89,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.25)',
+  },
+  rejectedRow: {
+    backgroundColor: 'rgba(255,59,48,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.2)',
+  },
+  responseText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  approvedText: {
+    color: '#34C759',
+  },
+  rejectedText: {
+    color: '#FF3B30',
+  },
+  pendingText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.3)',
+    fontStyle: 'italic' as const,
+    textAlign: 'center' as const,
+    paddingVertical: 4,
+  },
+  time: {
+    fontSize: 11,
+    marginTop: 6,
+  },
+  timeRight: {
+    color: 'rgba(255,255,255,0.35)',
+    textAlign: 'right' as const,
+  },
+  timeLeft: {
+    color: 'rgba(255,255,255,0.25)',
+    textAlign: 'left' as const,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end' as const,
+  },
+  sheet: {
+    backgroundColor: '#1E1E1E',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: '#2E2E2E',
+    maxHeight: '85%',
+  },
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2E2E2E',
+  },
+  headerLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,122,255,0.12)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  body: {
+    padding: 20,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  input: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top' as const,
+    paddingTop: 12,
+  },
+  footer: {
+    flexDirection: 'row' as const,
+    gap: 10,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#2E2E2E',
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  sendBtn: {
+    flex: 2,
+    flexDirection: 'row' as const,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+  },
+  sendBtnDisabled: {
+    opacity: 0.4,
+  },
+  sendBtnText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#fff',
+  },
+});
 
 const clientStyles = StyleSheet.create({
   card: {
@@ -805,6 +1382,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     marginBottom: 4,
   },
+  senderNameOutside: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 4,
+    paddingHorizontal: 2,
+  },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
@@ -849,6 +1433,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#2E2E2E',
     alignItems: 'flex-end' as const,
+  },
+  attachButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,122,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,122,255,0.25)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginRight: 8,
   },
   input: {
     flex: 1,

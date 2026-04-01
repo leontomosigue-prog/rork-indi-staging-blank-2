@@ -86,6 +86,8 @@ export const MessageSchema = z.object({
   senderId: z.string(),
   text: z.string(),
   attachments: z.array(z.string()).optional(),
+  type: z.enum(['text', 'budget_proposal', 'budget_response']).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   createdAt: z.coerce.date(),
 });
 
