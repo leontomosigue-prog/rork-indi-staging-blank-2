@@ -13,7 +13,6 @@ import {
   Animated,
   Pressable,
   Modal,
-  ScrollView,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -36,9 +35,9 @@ import {
   X,
   ThumbsUp,
   ThumbsDown,
-  DollarSign,
   FileCheck,
   FileX,
+  ExternalLink,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { trpc } from '@/lib/trpc';
@@ -276,21 +275,21 @@ function BudgetProposalBubble({
         </View>
       </View>
 
-      {meta.description ? (
-        <Text style={budgetStyles.description}>{meta.description}</Text>
-      ) : null}
-
-      {meta.value ? (
-        <View style={budgetStyles.valueRow}>
-          <DollarSign size={13} color="#34C759" />
-          <Text style={budgetStyles.value}>
-            R$ {Number(meta.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </Text>
-        </View>
-      ) : null}
-
-      {meta.notes ? (
-        <Text style={budgetStyles.notes}>{meta.notes}</Text>
+      {meta.pdfUrl ? (
+        <TouchableOpacity
+          style={budgetStyles.pdfButton}
+          onPress={() => {
+            const { Linking } = require('react-native');
+            Linking.openURL(meta.pdfUrl).catch(() =>
+              Alert.alert('Erro', 'Não foi possível abrir o PDF')
+            );
+          }}
+          activeOpacity={0.75}
+        >
+          <FileText size={15} color="#007AFF" />
+          <Text style={budgetStyles.pdfButtonText}>Visualizar PDF</Text>
+          <ExternalLink size={13} color="rgba(0,122,255,0.7)" />
+        </TouchableOpacity>
       ) : null}
 
       <View style={budgetStyles.divider} />
@@ -347,9 +346,7 @@ export default function ChatScreen() {
   const [messageText, setMessageText] = useState('');
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [budgetTitle, setBudgetTitle] = useState('');
-  const [budgetValue, setBudgetValue] = useState('');
-  const [budgetDescription, setBudgetDescription] = useState('');
-  const [budgetNotes, setBudgetNotes] = useState('');
+  const [budgetPdfUrl, setBudgetPdfUrl] = useState('');
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -461,24 +458,20 @@ export default function ChatScreen() {
   };
 
   const handleSendBudget = () => {
-    if (!budgetTitle.trim() || !user?.id || !conversationId) return;
-    const valueNum = parseFloat(budgetValue.replace(',', '.'));
+    if (!budgetPdfUrl.trim() || !user?.id || !conversationId) return;
+    const title = budgetTitle.trim() || 'Orçamento';
     sendMutation.mutate({
       userId: user.id,
       conversationId,
-      text: `Orçamento enviado: ${budgetTitle}`,
+      text: `Orçamento enviado: ${title}`,
       type: 'budget_proposal',
       metadata: {
-        title: budgetTitle.trim(),
-        value: isNaN(valueNum) ? undefined : valueNum,
-        description: budgetDescription.trim() || undefined,
-        notes: budgetNotes.trim() || undefined,
+        title,
+        pdfUrl: budgetPdfUrl.trim(),
       },
     } as any);
     setBudgetTitle('');
-    setBudgetValue('');
-    setBudgetDescription('');
-    setBudgetNotes('');
+    setBudgetPdfUrl('');
     setShowBudgetModal(false);
   };
 
@@ -784,48 +777,35 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={modalStyles.body} showsVerticalScrollIndicator={false}>
-              <Text style={modalStyles.fieldLabel}>Título do Orçamento *</Text>
+            <View style={modalStyles.body}>
+              <Text style={modalStyles.fieldLabel}>Título (opcional)</Text>
               <TextInput
                 style={modalStyles.input}
                 value={budgetTitle}
                 onChangeText={setBudgetTitle}
                 placeholder="Ex: Orçamento de Peças - Empilhadeira"
                 placeholderTextColor="rgba(255,255,255,0.25)"
+                returnKeyType="next"
               />
 
-              <Text style={modalStyles.fieldLabel}>Valor Total (R$)</Text>
-              <TextInput
-                style={modalStyles.input}
-                value={budgetValue}
-                onChangeText={setBudgetValue}
-                placeholder="Ex: 1500,00"
-                placeholderTextColor="rgba(255,255,255,0.25)"
-                keyboardType="decimal-pad"
-              />
-
-              <Text style={modalStyles.fieldLabel}>Descrição</Text>
+              <Text style={modalStyles.fieldLabel}>Link do PDF *</Text>
               <TextInput
                 style={[modalStyles.input, modalStyles.textArea]}
-                value={budgetDescription}
-                onChangeText={setBudgetDescription}
-                placeholder="Descreva os serviços/produtos incluídos no orçamento..."
+                value={budgetPdfUrl}
+                onChangeText={setBudgetPdfUrl}
+                placeholder="Cole aqui o link do PDF (Google Drive, Dropbox, etc.)"
                 placeholderTextColor="rgba(255,255,255,0.25)"
-                multiline
-                numberOfLines={4}
-              />
-
-              <Text style={modalStyles.fieldLabel}>Observações</Text>
-              <TextInput
-                style={[modalStyles.input, modalStyles.textArea]}
-                value={budgetNotes}
-                onChangeText={setBudgetNotes}
-                placeholder="Condições de pagamento, prazo de entrega, validade do orçamento..."
-                placeholderTextColor="rgba(255,255,255,0.25)"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
                 multiline
                 numberOfLines={3}
               />
-            </ScrollView>
+
+              <Text style={modalStyles.hint}>
+                Gere o PDF no seu programa, compartilhe e cole o link acima.
+              </Text>
+            </View>
 
             <View style={modalStyles.footer}>
               <TouchableOpacity
@@ -838,10 +818,10 @@ export default function ChatScreen() {
               <TouchableOpacity
                 style={[
                   modalStyles.sendBtn,
-                  !budgetTitle.trim() && modalStyles.sendBtnDisabled,
+                  !budgetPdfUrl.trim() && modalStyles.sendBtnDisabled,
                 ]}
                 onPress={handleSendBudget}
-                disabled={!budgetTitle.trim() || sendMutation.isPending}
+                disabled={!budgetPdfUrl.trim() || sendMutation.isPending}
                 activeOpacity={0.7}
               >
                 {sendMutation.isPending ? (
@@ -920,12 +900,23 @@ const budgetStyles = StyleSheet.create({
     fontWeight: '700' as const,
     color: '#34C759',
   },
-  notes: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    lineHeight: 17,
+  pdfButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: 'rgba(0,122,255,0.25)',
     marginBottom: 8,
-    fontStyle: 'italic' as const,
+  },
+  pdfButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#007AFF',
   },
   divider: {
     height: 1,
@@ -1090,9 +1081,16 @@ const modalStyles = StyleSheet.create({
     color: '#FFFFFF',
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 70,
     textAlignVertical: 'top' as const,
     paddingTop: 12,
+  },
+  hint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.25)',
+    marginTop: 10,
+    lineHeight: 17,
+    fontStyle: 'italic' as const,
   },
   footer: {
     flexDirection: 'row' as const,
