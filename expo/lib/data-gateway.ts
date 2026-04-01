@@ -1082,6 +1082,31 @@ class DataGateway {
     }
   }
 
+  async atualizarPayloadTicket(ticketId: string, payloadPatch: Record<string, any>): Promise<ApiResponse<LocalTicket>> {
+    this.logRequest('tickets', 'atualizarPayloadTicket', { ticketId });
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
+      const tickets: LocalTicket[] = stored ? JSON.parse(stored) : [];
+      const idx = tickets.findIndex(t => t.id === ticketId);
+      if (idx === -1) {
+        this.logResponse('tickets', 'atualizarPayloadTicket', 'error', 'NOT_FOUND');
+        return { status: 'error', errorCode: 'NOT_FOUND', errorMessage: 'Pedido não encontrado' };
+      }
+      tickets[idx] = {
+        ...tickets[idx],
+        payload: { ...(tickets[idx].payload ?? {}), ...payloadPatch },
+        updatedAt: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      console.log(`[DataGateway] atualizarPayloadTicket: ticket ${ticketId} payload updated`);
+      this.logResponse('tickets', 'atualizarPayloadTicket', 'ok');
+      return { status: 'ok', data: tickets[idx] };
+    } catch (error) {
+      this.logResponse('tickets', 'atualizarPayloadTicket', 'error', 'UPDATE_FAILED');
+      return { status: 'error', errorCode: 'UPDATE_FAILED', errorMessage: String(error) };
+    }
+  }
+
   async removerColaborador(id: string): Promise<ApiResponse<void>> {
     this.logRequest('admin', 'removerColaborador', { id });
     try {

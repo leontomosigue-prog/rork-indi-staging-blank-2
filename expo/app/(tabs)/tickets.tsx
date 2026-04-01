@@ -660,14 +660,22 @@ function ChamadosTab() {
     takeMutation.mutate({ userId: user.id, ticketId: ticket.id });
   };
 
-  const handleContinueToChat = () => {
+  const handleContinueToChat = async () => {
     if (!user?.id || !detailsTicket) return;
     setIsCreatingConversation(true);
+    const trimmedOm = omNumber.trim();
+    if (trimmedOm) {
+      await dataGateway.atualizarPayloadTicket(detailsTicket.id, { omNumber: trimmedOm });
+      console.log(`[tickets] OM "${trimmedOm}" saved to AsyncStorage for ticket ${detailsTicket.id}`);
+    }
     createConversationMutation.mutate({
       userId: user.id,
       ticketId: detailsTicket.id,
-      ticketData: detailsTicket,
-      omNumber: omNumber.trim() || undefined,
+      ticketData: {
+        ...detailsTicket,
+        payload: { ...(detailsTicket.payload ?? {}), ...(trimmedOm ? { omNumber: trimmedOm } : {}) },
+      },
+      omNumber: trimmedOm || undefined,
     } as any);
   };
 
