@@ -5,17 +5,15 @@ export default function NotFoundScreen() {
   const router = useRouter();
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen options={{ title: 'Página não encontrada' }} />
-      <View style={styles.container}>
-        <Text style={styles.emoji}>🔍</Text>
-        <Text style={styles.title}>Página não encontrada</Text>
-        <Text style={styles.subtitle}>A tela que você procura não existe.</Text>
-        <Pressable style={styles.button} onPress={() => router.replace('/')}>
-          <Text style={styles.buttonText}>Voltar ao início</Text>
-        </Pressable>
-      </View>
-    </>
+      <Text style={styles.emoji}>🔍</Text>
+      <Text style={styles.title}>Página não encontrada</Text>
+      <Text style={styles.subtitle}>A tela que você procura não existe.</Text>
+      <Pressable style={styles.button} onPress={() => router.replace('/')}>
+        <Text style={styles.buttonText}>Voltar ao início</Text>
+      </Pressable>
+    </View>
   );
 }
 

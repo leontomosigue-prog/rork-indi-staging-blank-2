@@ -63,7 +63,7 @@ function RootLayoutNav() {
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="register" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="edit-profile" options={{ title: "Editar Perfil" }} />
+
             <Stack.Screen name="chat/[id]" options={{ title: "Conversa" }} />
             <Stack.Screen name="debug-auth" options={{ title: "Debug Auth" }} />
             <Stack.Screen name="forgot-password" options={{ headerShown: false, presentation: 'modal' }} />

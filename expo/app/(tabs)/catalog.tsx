@@ -374,12 +374,12 @@ export default function CatalogScreen() {
         <Text style={styles.itemDetails}>
           {item.marca} - {item.modelo}
         </Text>
-        {item.preco && (
+        {item.preco != null && item.preco > 0 ? (
           <Text style={styles.itemPrice}>
             R$ {item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
-        )}
-        {item.diaria && item.mensal && (
+        ) : null}
+        {item.diaria != null && item.mensal != null ? (
           <View style={styles.priceContainer}>
             <Text style={styles.itemPrice}>
               Diária: R$ {item.diaria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -388,7 +388,7 @@ export default function CatalogScreen() {
               Mensal: R$ {item.mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
       <View style={styles.actions}>
         <TouchableOpacity
